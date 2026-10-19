@@ -1,0 +1,11 @@
+{
+  "name": "PhonoMonsters",
+  "short_name": "PhonoMonsters",
+  "description": "Where monster buddies make reading easy!",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#bfe6ef",
+  "theme_color": "#6ed0cf",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}
