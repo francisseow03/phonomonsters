@@ -4,7 +4,6 @@ import * as store from './store.js';
 import { music, say, sfx, stopVoice, voiceTime, preload, isSpeaking, speak } from './audio.js';
 import { settingsPopup, avatarInner, picSrc } from './ui.js';
 import { STORIES, MORE_STORIES } from './data.js';
-import { lockOver } from './game.js';
 import { slug } from './voice.js';
 import TIMINGS from './story_timings.js';
 
@@ -34,11 +33,13 @@ route('reading', el => {
     }
     // unlocked: draw a fresh cover over the locked Figma card
     const card = box(x, 163, 261, 531, 'z-10');
-    card.style.cssText += `border-radius:15px;background:${st.color};display:flex;flex-direction:column;align-items:center;cursor:pointer;font-family:Nunito,sans-serif;color:#fff`;
-    card.innerHTML = `<div style="margin-top:46px;font:700 36px Nunito">Story ${k}</div>
-      <div style="margin-top:8px;background:#fff;color:${st.color};border-radius:30px;padding:1px 16px;font:800 16px Nunito">Level ${st.level}</div>
-      <div style="margin-top:24px;width:230px;height:250px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center"><img src="${picSrc(st.cover)}" style="width:180px;height:180px" alt=""></div>
-      <div style="margin-top:16px;font:800 20px Nunito;text-align:center;padding:0 14px;line-height:1.15">${st.title}</div>`;
+    // same layout as the Figma Story 1 card: title centred at y 85, level pill at 123, picture inset 16px from 169
+    card.style.cssText += `border-radius:15px;background:${st.color};cursor:pointer;font-family:Nunito,sans-serif;color:#fff`;
+    card.innerHTML = `<div style="position:absolute;left:0;right:0;top:61px;text-align:center;font:700 36px/49px Nunito">Story ${k}</div>
+      <div style="position:absolute;left:80px;top:123px;width:101px;height:23px;border-radius:50px;background:#fff;color:${st.color};display:flex;align-items:center;justify-content:center;font:800 16px Nunito">Level ${st.level}</div>
+      <div style="position:absolute;left:16px;top:169px;width:230px;height:332px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px">
+        <img src="${picSrc(st.cover)}" style="width:170px;height:170px" alt="">
+        <div style="font:800 20px Nunito;color:${st.color};text-align:center;padding:0 12px;line-height:1.15">${st.title}</div></div>`;
     t.append(card);
     onTap(card, () => go('tale', { s: k, p: 1 }), { sound: 'page' });
     if (pr.stories[k]) t.append(box(x + 155, 170, 96, 34, "rounded-full bg-white text-[#ffb000] font-['Nunito'] font-extrabold text-[18px] flex items-center justify-center shadow-[0_3px_0_#e8a800] z-20", `★ ×${pr.stories[k]}`));

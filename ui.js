@@ -1,5 +1,5 @@
 // Shared UI pieces built from the Figma frames: header, nav, popups, parent gate, drag, avatars.
-import { $, $$, h, box, onTap, go, overlay, frameCard, tpl, stagePoint, stageRect, animate, toast } from './core.js';
+import { $, $$, h, box, onTap, go, overlay, frameCard, tpl, stagePoint, stageRect, animate, toast, getScale } from './core.js';
 import * as store from './store.js';
 import { sfx, say, stopVoice, applySettings } from './audio.js';
 import { PICS } from './data.js';
@@ -143,11 +143,44 @@ export function lessonChrome(root, ids, handlers = {}) {
 /** Pink round "next" arrow in the bottom-right, as in the lesson frames. */
 export function nextArrow(root, onNext, { show = true } = {}) {
   const b = box(1073, 733, 75, 79, 'cursor-pointer');
+  b.style.zIndex = 45; // above any monsters left in the tray
   b.innerHTML = `<svg viewBox="0 0 75 79" width="75" height="79"><circle cx="37.5" cy="41.5" r="37.5" fill="#e17b9f"/><circle cx="37.5" cy="37.5" r="37.5" fill="#fa96ba"/><path d="M22 37.5h30M40 24l13.5 13.5L40 51" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
   root.append(b);
   onTap(b, onNext, { sound: 'nav' });
   b.style.display = show ? '' : 'none';
   return b;
+}
+
+/**
+ * Keep a big centred letter/blend on one line: widen its (centred) box to maxW and shrink the
+ * font until the text fits. Figma's boxes are 531px wide, so "Mm", "Ww" or "mp" used to wrap.
+ */
+export function fitText(node, maxW, minPx = 80) {
+  if (!node) return;
+  Object.assign(node.style, { whiteSpace: 'nowrap', wordBreak: 'normal', width: maxW + 'px' });
+  node.querySelectorAll('p').forEach(p => { p.style.whiteSpace = 'nowrap'; p.style.wordBreak = 'normal'; });
+  const fit = () => {
+    node.style.fontSize = '';
+    let fs = parseFloat(getComputedStyle(node).fontSize);
+    // measure the text itself (its <p> is a full-width block)
+    const txt = document.createTreeWalker(node, NodeFilter.SHOW_TEXT).nextNode();
+    if (!txt) return;
+    const r = document.createRange(); r.selectNodeContents(txt);
+    while (fs > minPx && r.getBoundingClientRect().width / getScale() > maxW - 16) { fs *= 0.92; node.style.fontSize = fs + 'px'; }
+  };
+  fit();
+  document.fonts?.ready.then(fit);
+}
+
+/** Six words on an even 2 x 3 grid centred in the white lesson card (the Figma slots were uneven). */
+export function wordGrid(t, words, html = w => w) {
+  return words.map((w, j) => {
+    const n = box(j % 2 ? 617 : 237, 206 + Math.floor(j / 2) * 160, 340, 140, '');
+    n.style.cssText += "display:flex;align-items:center;justify-content:center;cursor:pointer;white-space:nowrap;font:400 100px 'Cal Sans',Fredoka,sans-serif;color:#57b8b6";
+    n.innerHTML = `<span>${html(w)}</span>`;
+    t.append(n);
+    return n;
+  });
 }
 
 // ---------- drag & drop (stage-scaled) ----------

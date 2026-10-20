@@ -1,10 +1,10 @@
 // Main tabs: Home, Discover, Minigames, PhonoDex (+ monster page), Shop.
-import { route, go, tpl, $, $$, h, box, onTap, overlay, toast, stagePoint, getScale } from './core.js';
+import { route, go, tpl, $, $$, h, box, onTap, overlay, toast, stagePoint, getScale, animate } from './core.js';
 import * as store from './store.js';
 import { music, say, sfx, preload } from './audio.js';
 import { bindHeader, settingsPopup, parentGate, monsterSrc } from './ui.js';
 import { MONSTERS, LETTERS, VOWELS } from './data.js';
-import { dailyCheckIn, checkBadges, badgeGrid, lockOver, lockSvg } from './game.js';
+import { dailyCheckIn, checkBadges, badgeGrid, lockLevel, lockSvg } from './game.js';
 
 /** Horizontal drag-to-scroll for mouse users (touch scrolls natively). */
 function dragScroll(el) {
@@ -64,7 +64,9 @@ route('discover', (el, { page = 1 } = {}) => {
   bindHeader(t);
   const pr = store.progress(), lv = pr.levels;
   const open = n => store.levelOpen(n);
-  const lock = (n, x) => lockOver(t, x, 293, 261, 330, store.LEVEL_GATES[n].text);
+  const lock = (n, x, play) => lockLevel(t, x, store.LEVEL_GATES[n].text, play);
+  // the Figma Play button (+ its label) under each of the four level cards
+  const PLAY = { 45: ['75:68', '60:103'], 326: ['75:70', '75:71'], 607: ['75:72', '75:74'], 888: ['75:73', '75:75'] };
   if (page === 1) {
     [45, 326, 607, 888].forEach((x, i) => {
       const n = i + 1;
@@ -74,7 +76,7 @@ route('discover', (el, { page = 1 } = {}) => {
       // tiny progress badge on each level card
       const done = i === 0 ? Object.keys(pr.letters).length : lv[n] || 0;
       if (done) progressChip(t, x, `★ ${i === 0 ? done + '/26' : done}`);
-      if (!open(n)) lock(n, x);
+      if (!open(n)) lock(n, x, PLAY[x].map(id => $(t, id)));
     });
     const more = h('div', 'pm-arrowbtn', 'More levels ➜');
     Object.assign(more.style, { left: '597px', top: '660px', transform: 'translateX(-50%)' });
@@ -98,7 +100,7 @@ route('discover', (el, { page = 1 } = {}) => {
       t.append(hit);
       onTap(hit, () => go(`level${c.n}`), { sound: 'nav' });
       if (lv[c.n]) progressChip(t, c.x, `★ ${lv[c.n]}`);
-      if (!open(c.n)) lock(c.n, c.x);
+      if (!open(c.n)) lock(c.n, c.x, [play]);
     }
     const back = h('div', 'pm-arrowbtn', '⬅ Levels 1 - 4');
     Object.assign(back.style, { left: '597px', top: '660px', transform: 'translateX(-50%)' });
@@ -185,7 +187,8 @@ route('monster', (el, { L = 'A', filter = 'all' }) => {
   const art = $(t, '97:495');
   art.innerHTML = `<img src="${monsterSrc(L)}" alt="Monster ${L}" class="absolute inset-0 size-full object-contain pointer-events-none">`;
   art.classList.add('float');
-  onTap(art, () => { sfx('giggle'); art.classList.remove('float'); art.classList.add('wiggle'); setTimeout(() => { art.classList.remove('wiggle'); art.classList.add('float'); }, 600); say(`snd_${L}`); }, { sound: null });
+  // wiggle the picture inside the floating box, so the float carries on instead of snapping down
+  onTap(art, () => { sfx('giggle'); animate(art.querySelector('img'), 'wiggle'); say(`snd_${L}`); }, { sound: null });
   const playSound = () => { say(`snd_${L}`); };
   [$(t, '498:413'), $(t, '81:239')].forEach(n => onTap(n, playSound));
   [$(t, '81:244'), $(t, '81:246'), $(t, '81:240')].forEach(n => onTap(n, () => say(`desc_${L}`)));
