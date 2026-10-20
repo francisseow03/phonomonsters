@@ -30,9 +30,13 @@ route('l2', (el, P) => {
   preload(`w_${slug(word)}`, ...W.map(L => `ph_${L}`));
   music('learn');
   if (step === 'intro') {
+    if (i === 0) store.startRun();
     const t = tpl('l2intro');
     el.append(t);
     t.classList.remove('cursor-pointer');
+    // the Figma frame has the letter row ~20px right of centre
+    ['420:720', '420:719', '420:721'].forEach(id => { $(t, id).style.marginLeft = '-20px'; });
+    ['420:586', '420:677'].forEach(id => { const n = $(t, id); if (n) n.style.marginLeft = '-7px'; });
     swapForImage($(t, '420:677'), picSrc(word));
     const ids = ['420:720', '420:719', '420:721'];
     ids.forEach((id, k) => {
@@ -70,11 +74,11 @@ route('l2', (el, P) => {
   const options = shuffle([answer, ...shuffle(pool).slice(0, 2)]);
   const arrow = nextArrow(t, () => {
     if (i + 1 < words.length) go('l2', { ...P, i: i + 1, step: 'intro' });
-    else { store.completeLesson(2); go('reward', { replay: ['level2', {}], done: ['discover', {}] }); }
+    else { store.completeLesson(2); go('reward', { key: `l2_${mode}`, replay: ['level2', {}], done: ['discover', {}] }); }
   }, { show: false });
   const targetRect = { x: boxPos[target], y: 299, w: 212, h: 212 };
   options.forEach((L, k) => {
-    const m = box(190 + k * 280, 585, 220, 225, 'z-20');
+    const m = box((1194 - 3 * 220 - 2 * 60) / 2 + k * 280, 585, 220, 225, 'z-20');
     m.innerHTML = `<img src="${monsterSrc(L)}" class="absolute inset-0 size-full object-contain pointer-events-none" alt="">`;
     t.append(m);
     draggable(m, {
@@ -112,6 +116,7 @@ route('l3', (el, P) => {
   const word = words[i], W = word.toUpperCase().split('');
   preload(`w_${slug(word)}`, ...W.map(L => `ph_${L}`));
   music('learn');
+  if (i === 0) store.startRun();
   const t = tpl('l3train');
   el.append(t);
   ['309:210', '309:212', '309:213', '310:219', '310:221', '310:222'].forEach(id => $(t, id).remove());
@@ -139,7 +144,7 @@ route('l3', (el, P) => {
     if (running) return;
     if (ran) {
       if (i + 1 < words.length) return go('l3', { ...P, i: i + 1 });
-      store.completeLesson(3); return go('reward', { replay: ['level3', {}], done: ['discover', {}] });
+      store.completeLesson(3); return go('reward', { key: `l3_${n}`, replay: ['level3', {}], done: ['discover', {}] });
     }
     running = true; stopVoice();
     sfx('whistle'); await wait(500); sfx('chug', 0.6);
@@ -203,6 +208,7 @@ route('l4', (el, P) => {
   const next = s => go('l4', { ...P, step: s });
   music('learn');
   preload(`blend_${blend.b}`, `ph_${a}`, `ph_${b}`, ...blend.words.map(w => `w_${slug(w)}`));
+  if (step === 'meet' && i === 0) store.startRun();
   if (step === 'meet' || step === 'blend') {
     const t = tpl('l4blend');
     el.append(t);
@@ -212,18 +218,20 @@ route('l4', (el, P) => {
     if (step === 'meet') {
       ['427:411', '427:403', '428:580', '428:582'].forEach(id => $(t, id).remove());
       [a, b].forEach((L, k) => {
-        const m = box(250 + k * 400, 210, 300, 330, 'flex flex-col items-center');
+        const m = box(250 + k * 400, 252, 300, 370, 'flex flex-col items-center');
         m.innerHTML = `<img src="${monsterSrc(L)}" class="h-[300px] object-contain float" alt=""><p class="m-0 font-['Cal_Sans'] text-[64px] text-[#109586] leading-none">${L.toLowerCase()}</p>`;
         t.append(m);
         onTap(m, () => { say(`ph_${L}`); animate(m, 'wiggle'); }, { sound: 'giggle' });
       });
-      t.append(box(560, 330, 80, 80, "flex items-center justify-center font-['Cal_Sans'] text-[80px] text-[#fa96ba]", '+'));
+      t.append(box(560, 362, 80, 80, "flex items-center justify-center font-['Cal_Sans'] text-[80px] text-[#fa96ba]", '+'));
       sayAll(['ui_blend_meet', `ph_${a}`, `ph_${b}`, `blend_${blend.b}`]);
     } else {
+      // the blend + buttons group sits ~30px left of the card centre in the Figma frame
+      ['427:403', '427:411', '428:580', '428:582'].forEach(id => { $(t, id).style.marginLeft = '30px'; });
       $(t, '427:411').querySelector('p').textContent = blend.b;
       onTap($(t, '427:403'), () => say(`blend_${blend.b}`));
       onTap($(t, '427:411'), () => say(`blend_${blend.b}`));
-      const mic = () => micAttempt(t, { x: 733, y: 455, w: 110, h: 100 }, blend.b, [blend.words[0], blend.b, ...blend.words]);
+      const mic = () => micAttempt(t, { x: 763, y: 455, w: 110, h: 100 }, blend.b, [blend.words[0], blend.b, ...blend.words]);
       onTap($(t, '428:580'), mic, { sound: null }); onTap($(t, '428:582'), mic, { sound: null });
       sayAll([`blend_${blend.b}`, 'ui_say_it']);
     }
@@ -249,7 +257,7 @@ route('l4', (el, P) => {
   });
   const done = () => {
     if (i + 1 < set.length) go('l4', { ...P, i: i + 1, step: 'meet' });
-    else { store.completeLesson(4); go('reward', { replay: ['level4', {}], done: ['discover', {}] }); }
+    else { store.completeLesson(4); go('reward', { key: `l4_${diff}`, replay: ['level4', {}], done: ['discover', {}] }); }
   };
   onTap($(t, '428:590'), done, { sound: 'nav' }); onTap($(t, '428:591'), done, { sound: 'nav' });
   say('ui_word_list');

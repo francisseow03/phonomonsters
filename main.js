@@ -8,6 +8,7 @@ import './s-tabs.js';
 import './s-parents.js';
 import './s-level1.js';
 import './s-levels.js';
+import './s-levels2.js';
 import './s-games.js';
 import './s-reading.js';
 import './s-reward.js';

@@ -3,6 +3,7 @@ import { $, $$, h, box, onTap, go, overlay, frameCard, tpl, stagePoint, stageRec
 import * as store from './store.js';
 import { sfx, say, stopVoice, applySettings } from './audio.js';
 import { PICS } from './data.js';
+import { coinPill, onAvatarChange } from './game.js';
 
 export const monsterSrc = L => `m-${L.toUpperCase()}.png`;
 export const picSrc = w => { const p = PICS[w]; return !p ? null : p.startsWith('art:') ? `art-${p.slice(4)}.png` : `pic-${p}.svg`; };
@@ -16,7 +17,7 @@ export const AVATARS = {
   mO: { monster: 'O' }, mK: { monster: 'K' }, mP: { monster: 'P' }, mE: { monster: 'E' },
 };
 export function avatarInner(key) {
-  const a = AVATARS[key] || AVATARS.jane;
+  const a = AVATARS[key] || (/^m[A-Z]$/.test(key) ? { monster: key[1] } : AVATARS.jane);
   if (a.monster) return `<div class="absolute inset-0 overflow-hidden rounded-full bg-[#e6f5fb]"><img src="${monsterSrc(a.monster)}" class="absolute max-w-none w-[150%] left-[-25%] top-[-4%]" alt=""></div>`;
   return `<div class="absolute inset-0 overflow-hidden pointer-events-none"><img alt="" class="absolute max-w-none" src="${a.src}" style="width:${a.w}%;height:${a.h}%;left:${a.l}%;top:${a.t}%"></div>`;
 }
@@ -42,9 +43,11 @@ export function bindHeader(root) {
     if (t.textContent.trim() === 'Jane Doe' && t.classList.contains('text-[20px]') && p) t.textContent = p.name;
   }
   const av = $$(root, '[data-name="testpfp1-03-03 1"]')[0];
-  if (av && p) av.innerHTML = avatarInner(p.avatar);
+  const drawAvatar = () => { if (av && store.profile()) av.innerHTML = avatarInner(store.profile().avatar); };
+  drawAvatar(); onAvatarChange(drawAvatar);
   const badge = $$(root, 'div').find(d => d.className.includes('w-[196px]') && d.className.includes('93.75%'));
   if (badge) onTap(badge, () => parentGate(() => go('settings')));
+  if (p) coinPill(root);
 }
 
 // ---------- popups ----------
