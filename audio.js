@@ -9,11 +9,13 @@ const sfxBus = ctx.createGain(); sfxBus.connect(master);
 const voiceBus = ctx.createGain(); voiceBus.connect(master);
 
 const cache = new Map();
+const missing = new Set(); // files that 404 (newer content is voiced by speech synthesis instead)
 function load(url) {
+  if (missing.has(url)) return Promise.resolve(null);
   if (!cache.has(url)) {
-    cache.set(url, fetch(url).then(r => { if (!r.ok) throw new Error(url); return r.arrayBuffer(); })
+    cache.set(url, fetch(url).then(r => { if (!r.ok) { if (r.status === 404) missing.add(url); throw new Error(url); } return r.arrayBuffer(); })
       .then(b => new Promise((res, rej) => ctx.decodeAudioData(b, res, rej)))
-      .catch(e => { cache.delete(url); console.warn('audio', e); return null; }));
+      .catch(e => { cache.delete(url); if (!missing.has(url)) console.warn('audio', e); return null; }));
   }
   return cache.get(url);
 }
@@ -52,10 +54,69 @@ let seq = 0;
 let startedAt = 0;
 export const isSpeaking = () => speaking;
 
-export function preload(...keys) { keys.forEach(k => load(`v-${k}.mp3`)); }
+export function preload(...keys) { keys.forEach(k => { if (!ttsOnly.has(k)) load(`v-${k}.mp3`); }); }
+
+// ---------- speech synthesis fallback ----------
+// Lines without a recorded mp3 are spoken by the device voice. Text comes from
+// registerLines(), or is derived from the key (w_<word>, tts:<text>).
+const LINES = {};
+const ttsOnly = new Set(); // registered lines have no recording, so skip the fetch
+export function registerLines(map) { Object.assign(LINES, map); Object.keys(map).forEach(k => ttsOnly.add(k)); }
+function textFor(key) {
+  if (key.startsWith('tts:')) return key.slice(4);
+  if (LINES[key]) return LINES[key];
+  if (key.startsWith('w_')) return key.slice(2).replace(/-/g, ' ');
+  return null;
+}
+const synth = window.speechSynthesis;
+let ttsVoice = null;
+function pickVoice() {
+  if (!synth || ttsVoice) return ttsVoice;
+  const vs = synth.getVoices().filter(v => /^en(-|_|$)/i.test(v.lang));
+  ttsVoice = vs.find(v => /samantha|aria|jenny|female|zira|karen|google us/i.test(v.name)) || vs.find(v => /en-us/i.test(v.lang)) || vs[0] || null;
+  return ttsVoice;
+}
+synth?.addEventListener?.('voiceschanged', () => { ttsVoice = null; pickVoice(); });
+let ttsActive = false;
+function tts(text, my, onWord) {
+  return new Promise(res => {
+    if (my !== seq) return res(false);
+    const s = settings();
+    let done = false, timer = 0;
+    const finish = ok => {
+      if (done) return; done = true; clearTimeout(timer);
+      if (currentRes === finish) currentRes = null;
+      ttsActive = false; speaking = false; applySettings();
+      res(ok && my === seq);
+    };
+    currentRes = finish; speaking = true; ttsActive = true; applySettings();
+    startedAt = ctx.currentTime;
+    // engines without voices never fire onend; give up after a reading-speed estimate
+    timer = setTimeout(() => finish(true), 1200 + text.length * 95);
+    if (!synth || !s.narrationOn) return;
+    try {
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US'; u.rate = 0.82; u.pitch = 1.15; u.volume = Math.max(0, Math.min(1, s.narration));
+      const v = pickVoice(); if (v) u.voice = v;
+      u.onend = () => finish(true);
+      u.onerror = () => finish(true);
+      if (onWord) u.onboundary = e => { if (!e.name || e.name === 'word') onWord(e.charIndex); };
+      synth.speak(u);
+    } catch { finish(true); }
+  });
+}
+/** Speak arbitrary text with the device voice; onWord(charIndex) fires per word where supported. */
+export function speak(text, onWord) { stopVoice(); return tts(text, seq, onWord); }
 
 function play(key, my) {
-  return load(`v-${key}.mp3`).then(buf => new Promise(res => {
+  if (key.startsWith('tts:')) return tts(key.slice(4), my);
+  if (ttsOnly.has(key)) return tts(LINES[key], my);
+  return load(`v-${key}.mp3`).then(buf => {
+    if (buf || my !== seq) return buf;
+    const text = textFor(key);
+    return text ? tts(text, my) : null;
+  }).then(buf => typeof buf === 'boolean' ? buf : new Promise(res => {
     if (!buf || my !== seq) return res(false);
     const s = ctx.createBufferSource(); s.buffer = buf; s.connect(voiceBus);
     current = s; currentRes = res; speaking = true; applySettings();
@@ -83,7 +144,8 @@ export const voiceTime = () => ctx.currentTime - startedAt;
 export function stopVoice() {
   seq++;
   if (current) { try { current.onended = null; current.stop(); } catch {} current = null; }
-  if (currentRes) { currentRes(false); currentRes = null; }
+  if (ttsActive) { try { synth.cancel(); } catch {} }
+  if (currentRes) { const r = currentRes; currentRes = null; r(false); }
   speaking = false; applySettings();
 }
 export const wait = ms => new Promise(r => setTimeout(r, ms));

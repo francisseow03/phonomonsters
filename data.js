@@ -107,3 +107,53 @@ export const PRAISE = ['Great job!', 'Well done!', 'Awesome!', 'You did it!', 'S
 export const TRY_AGAIN = ['Oops, try again!', 'Almost! Try again.', 'Not quite. Listen again!'];
 
 export const AVATARS = ['pfp-jane', 'pfp-victor', 'pfp-rebecca', 'pfp-other'];
+
+// Level 5: digraphs - two letters, one sound. Voiced by the device voice (no recorded clips yet).
+export const DIGRAPHS = [
+  { d: 'sh', say: 'shh', color: '#a37fe8', words: ['ship', 'shop', 'fish', 'dish', 'shell', 'wish'] },
+  { d: 'ch', say: 'chuh', color: '#fb5063', words: ['chip', 'chin', 'chop', 'much', 'lunch', 'chick'] },
+  { d: 'th', say: 'thuh', color: '#1fa7e1', words: ['thin', 'bath', 'moth', 'path', 'math', 'thick'] },
+  { d: 'wh', say: 'wuh', color: '#75d069', words: ['whip', 'when', 'whale', 'which', 'wheel', 'whisk'] },
+  { d: 'ck', say: 'kuh', color: '#ffb000', words: ['duck', 'sock', 'rock', 'kick', 'back', 'neck'] },
+];
+
+// Level 6 boss battle: picture words that have both a picture and a recorded word clip
+export const BOSS_WORDS = ['cat', 'dog', 'pig', 'sun', 'hen', 'bed', 'fox', 'bus', 'cup', 'hat', 'map', 'bug', 'jam', 'web', 'box', 'van', 'frog', 'crab', 'drum', 'flag', 'milk', 'nest', 'tent', 'lamp', 'duck', 'star', 'ant'];
+
+// Stories 2-4: decodable read-alongs that open as the child moves through the levels.
+// pic: a PICS word. Words in **bold** can be tapped to hear them.
+export const MORE_STORIES = {
+  2: {
+    title: 'The Hen and the Egg', level: 2, color: '#79c9ee', cover: 'hen',
+    gate: { text: 'Finish a Level 2 lesson', test: p => p.levels[2] >= 1 },
+    pages: [
+      { pic: 'nest', lines: ['A red **hen** sat on a **nest**.'] },
+      { pic: 'egg', lines: ['In the **nest** is an **egg**.'] },
+      { pic: 'sun', lines: ['The **sun** is hot.', 'The **hen** sits and sits.'] },
+      { pic: 'egg', lines: ['**Tap**, **tap**, **tap**!', 'The **egg** has a **crack**.'] },
+      { pic: 'hen', lines: ['Out pops a chick!', 'The **hen** is so **glad**.'] },
+    ],
+  },
+  3: {
+    title: 'Frog and Crab', level: 3, color: '#75d069', cover: 'frog',
+    gate: { text: 'Finish a Level 3 lesson', test: p => p.levels[3] >= 1 },
+    pages: [
+      { pic: 'frog', lines: ['A **frog** sat on a log.'] },
+      { pic: 'crab', lines: ['A **crab** ran on the **sand**.'] },
+      { pic: 'frog', lines: ['The **frog** can **jump**.', 'The **crab** can grab.'] },
+      { pic: 'drum', lines: ['The **crab** has a **drum**.', 'Tum, tum, tum!'] },
+      { pic: 'crab', lines: ['The **frog** and the **crab**', '**clap** and **jump**.', 'What fun!'] },
+    ],
+  },
+  4: {
+    title: 'The Star Tent', level: 4, color: '#fb5063', cover: 'tent',
+    gate: { text: 'Finish a Level 4 lesson', test: p => p.levels[4] >= 1 },
+    pages: [
+      { pic: 'tent', lines: ['We **camp** in a **tent**.'] },
+      { pic: 'lamp', lines: ['The **lamp** is on.', 'It is snug.'] },
+      { pic: 'snail', lines: ['A **snail** slips past', 'the **tent**.'] },
+      { pic: 'star', lines: ['**Stop**! Look up!', 'The sky is **black**.', 'The stars are bright.'] },
+      { pic: 'tent', lines: ['We **sleep** in the **tent**.', 'Good night!'] },
+    ],
+  },
+};

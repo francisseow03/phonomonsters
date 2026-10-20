@@ -9,17 +9,44 @@ export const current = () => active?.name;
 
 export function route(name, fn) { routes[name] = fn; }
 
-/** Show a screen. Controllers get (el, params) and may return a cleanup fn. */
+let navSeq = 0;
+/** Resolves once the images inside root have decoded (or after ms, whichever is first). */
+function imagesReady(root, ms) {
+  const imgs = [...root.querySelectorAll('img')].filter(i => i.src && !i.complete);
+  if (!imgs.length) return Promise.resolve();
+  return Promise.race([
+    Promise.all(imgs.map(i => (i.decode ? i.decode() : Promise.resolve()).catch(() => {}))),
+    new Promise(r => setTimeout(r, ms)),
+  ]);
+}
+
+/**
+ * Show a screen. Controllers get (el, params) and may return a cleanup fn.
+ * The new screen is built hidden on top of the old one, waits for its images,
+ * then fades in over it, so there is never a blank frame between screens.
+ */
 export async function go(name, params = {}) {
+  const my = ++navSeq;
   stopVoice();
   closeOverlays();
   if (active?.cleanup) try { active.cleanup(); } catch (e) { console.error(e); }
+  const old = [...stage.querySelectorAll(':scope > .screen')];
+  old.forEach(s => s.classList.add('leaving'));
   const el = document.createElement('div');
-  el.className = 'screen enter';
-  const cleanup = await routes[name](el, params);
-  stage.querySelectorAll(':scope > .screen').forEach(s => s.remove());
-  stage.prepend(el);
-  active = { name, el, params, cleanup };
+  el.className = 'screen pending';
+  const last = old[old.length - 1];
+  last ? last.after(el) : stage.prepend(el);
+  active = { name, el, params, cleanup: null };
+  let cleanup = null;
+  try { cleanup = await routes[name](el, params); } catch (e) { console.error(e); }
+  // a controller that redirected (or a newer tap) has already replaced this screen
+  if (my !== navSeq) { el.remove(); if (typeof cleanup === 'function') try { cleanup(); } catch {} return; }
+  active.cleanup = typeof cleanup === 'function' ? cleanup : null;
+  await imagesReady(el, 700);
+  if (my !== navSeq) return;
+  el.classList.remove('pending');
+  el.classList.add('enter');
+  setTimeout(() => old.forEach(s => s.remove()), 400);
   window.scrollTo(0, 0);
 }
 

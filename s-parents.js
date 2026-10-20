@@ -5,6 +5,7 @@ import { music, sfx, applySettings, say } from './audio.js';
 import { avatarInner } from './ui.js';
 import { addProfileDialog } from './s-auth.js';
 import { LETTERS, VOWELS } from './data.js';
+import { BADGES } from './game.js';
 
 function fillBadge(t, nameId, avId) {
   const p = store.profile();
@@ -70,11 +71,11 @@ route('settings', el => {
 
   // child safety rows
   const val = (y, text) => { const v = box(830, y, 120, 28, "text-right font-['Nunito'] font-bold text-[16px] text-[#fa96ba]", text); t.append(v); return v; };
-  const lockV = val(552, s.parentalLock ? 'On' : 'Off');
+  const lockV = val(543, s.parentalLock ? 'On' : 'Off');
   const lockRow = box(705, 535, 330, 46, 'z-10'); t.append(lockRow);
   onTap(lockRow, () => { store.setSetting('parentalLock', !store.settings().parentalLock); lockV.textContent = store.settings().parentalLock ? 'On' : 'Off'; });
   const steps = [0, 15, 30, 45, 60];
-  const stV = val(612, s.screentime ? `${s.screentime} min` : 'No limit');
+  const stV = val(614, s.screentime ? `${s.screentime} min` : 'No limit');
   const stRow = box(705, 595, 330, 46, 'z-10'); t.append(stRow);
   onTap(stRow, () => {
     const next = steps[(steps.indexOf(store.settings().screentime) + 1) % steps.length];
@@ -150,8 +151,8 @@ route('progress', el => {
   const acc = pr.accuracy.slice(-30);
   const pct = acc.length ? Math.round(acc.reduce((a, b) => a + b.score, 0) / acc.length) : 0;
   const donut = $(t, '620:1779');
-  donut.innerHTML = `<div class="absolute left-[44px] top-[12px] size-[170px] rounded-full" style="background:conic-gradient(#1fa7e1 ${pct * 3.6}deg,#b3e8ff 0)"></div>
-    <div class="absolute left-[84px] top-[52px] size-[90px] rounded-full bg-[#fbfdfe] flex flex-col items-center justify-center font-['Nunito']"><b class="text-[28px] text-[#109586] leading-none">${pct}%</b><span class="text-[11px] text-[#555]">${acc.length} tries</span></div>`;
+  donut.innerHTML = `<div class="absolute top-[12px] size-[170px] rounded-full" style="left:11px;background:conic-gradient(#1fa7e1 ${pct * 3.6}deg,#b3e8ff 0)"></div>
+    <div style="left:51px" class="absolute top-[52px] size-[90px] rounded-full bg-[#fbfdfe] flex flex-col items-center justify-center font-['Nunito']"><b class="text-[28px] text-[#109586] leading-none">${pct}%</b><span class="text-[11px] text-[#555]">${acc.length} tries</span></div>`;
 
   // learned this week
   const week = Date.now() - 7 * 864e5;
@@ -162,6 +163,13 @@ route('progress', el => {
     if (L) $(t, id).querySelector('p').textContent = L + L.toLowerCase();
     else { $(t, id).querySelector('p').textContent = '?'; $(t, tile).style.opacity = 0.25; }
   });
+
+  // game summary
+  const lvi = store.levelInfo(pr.xp), nb = Object.keys(pr.badges).length;
+  const sum = box(220, 724, 900, 36, '');
+  sum.style.cssText += "display:flex;align-items:center;gap:26px;font:700 17px Nunito;color:#1c9886";
+  sum.innerHTML = `<span>⭐ Player level ${lvi.level}</span><span>🪙 ${pr.coins} coins</span><span>🔥 ${pr.streak.count}-day streak (best ${pr.streak.best || 0})</span><span>🏅 ${nb}/${BADGES.length} badges</span>`;
+  t.append(sum);
 
   onTap($(t, '620:1763'), () => go('settings'), { sound: 'nav' });
   onTap($(t, '620:1774'), () => go('settings'), { sound: 'nav' });

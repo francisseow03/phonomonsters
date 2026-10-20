@@ -10,18 +10,34 @@ import { slug } from './voice.js';
 const pool = () => { const u = store.progress().unlocked; return u.length >= 6 ? u : LETTERS; };
 const back = () => go('minigames');
 
+/** Games get harder every two completions: Stage 1 -> 2 -> 3. */
+export const stageOf = game => Math.min(3, 1 + Math.floor((store.progress().games[game] || 0) / 2));
+function stagePill(t, n, y = 52, x = 597) {
+  const p = h('div', 'pm-stage', `Stage ${n}${n === 3 ? ' ★' : ''}`);
+  Object.assign(p.style, { left: x + 'px', top: y + 'px' });
+  t.append(p);
+}
+
 // ---------------- Sound Practice ----------------
-const SOUND_ROUNDS = 8;
 route('soundgame', (el, { round = 0, score = 0 } = {}) => {
+  const stage = stageOf('sound');
+  // stage 1: the monster's own sound clip; 2: the bare phoneme; 3: bare phoneme + hidden monster, more rounds
+  const SOUND_ROUNDS = [6, 8, 10][stage - 1];
+  const key = stage === 1 ? 'snd_' : 'ph_';
+  if (round === 0) store.startRun();
   const t = tpl('soundgame');
   el.append(t);
   music('games');
+  stagePill(t, stage, 150);
+  // the monster + speaker pair sits ~26px left of centre in the Figma frame
+  ['312:305', '312:295'].forEach(id => { const n = $(t, id); if (n) n.style.marginLeft = '26px'; });
   lessonChrome(t, { exit: ['312:268'], gear: ['312:282'], pause: ['312:285'] }, { exit: back });
   const L = pick(pool());
   preload(`snd_${L}`, `ph_${L}`);
   const mon = $(t, '312:305');
-  swapForImage(mon, monsterSrc(L));
+  const monImg = swapForImage(mon, monsterSrc(L));
   mon.classList.remove('overflow-clip');
+  if (stage === 3) monImg.style.filter = 'brightness(0) opacity(.75)';
   const opts = shuffle([L, ...shuffle(LETTERS.filter(x => x !== L)).slice(0, 5)]);
   const tiles = ['313:336', '313:338', '313:339', '313:340', '313:341', '313:342'];
   const texts = ['313:343', '313:346', '313:347', '313:348', '313:349', '313:350'];
@@ -29,7 +45,7 @@ route('soundgame', (el, { round = 0, score = 0 } = {}) => {
   const progress = box(500, 120, 194, 24, 'flex gap-[6px] items-center justify-center');
   for (let k = 0; k < SOUND_ROUNDS; k++) progress.append(h('div', `size-[16px] rounded-full ${k < round ? 'bg-[#ffc843]' : k === round ? 'bg-[#1fa7e1]' : 'bg-[#b3e8ff]'}`));
   t.append(progress);
-  const play = () => { say(`snd_${L}`); animate(mon, 'wiggle'); };
+  const play = () => { say(key + L); animate(mon, 'wiggle'); };
   onTap($(t, '312:295'), play);
   onTap(mon, play, { sound: 'giggle' });
   tiles.forEach((id, k) => {
@@ -42,10 +58,11 @@ route('soundgame', (el, { round = 0, score = 0 } = {}) => {
         answered = true;
         store.recordAnswer(L, true);
         animate(tile, 'bounce'); animate(mon, 'bounce');
+        monImg.style.filter = '';
         await praise();
         await wait(300);
         if (round + 1 < SOUND_ROUNDS) go('soundgame', { round: round + 1, score: score + 1 });
-        else { store.completeGame('sound'); go('reward', { replay: ['soundgame', {}], done: ['minigames', {}] }); }
+        else { store.completeGame('sound'); go('reward', { key: `sound_${stage}`, replay: ['soundgame', {}], done: ['minigames', {}] }); }
       } else {
         store.recordAnswer(L, false);
         animate(tile, 'shake'); tryAgain();
@@ -53,21 +70,28 @@ route('soundgame', (el, { round = 0, score = 0 } = {}) => {
       }
     }, { sound: null });
   });
-  round === 0 ? sayAll(['ui_sound_game', `snd_${L}`]) : setTimeout(play, 400);
+  round === 0 ? sayAll(['ui_sound_game', key + L]) : setTimeout(play, 400);
 });
 
 // ---------------- Memory Matching ----------------
-const CARD_X = [91, 296, 501, 706, 911], CARD_Y = [197, 449];
+const CARD_Y = [197, 449];
 route('memory', el => {
+  const stage = stageOf('memory');
+  const pairs = 2 + stage; // 3, 4 or 5 pairs
+  const cardX = k => (1194 - (pairs * 185 + (pairs - 1) * 20)) / 2 + k * 205;
+  store.startRun();
   const t = tpl('memory');
   el.append(t);
   music('games');
+  stagePill(t, stage);
   const remove = ['3759', '3765', '3762', '3766', '3763', '3767', '3764', '3769', '3770', '3768', '3774', '3782', '3778', '3783', '3779', '3784', '3780', '3785', '3781', '3786', '3771', '3794', '3790', '3795', '3791', '3796', '3792', '3797', '3793', '3798'];
   remove.forEach(n => $(t, '332:' + n)?.remove());
   lessonChrome(t, { exit: ['332:3724'], gear: ['332:3735'], help: ['332:3741'] }, { exit: back, help: () => say('ui_memory') });
   onTap($(t, '332:3738'), () => go('memory'), { sound: 'flip' });
-  onTap($(t, '332:3753'), () => go('memory'), { sound: 'nav' });
-  const letters = shuffle(pool()).slice(0, 5);
+  // the pink arrow only restarted the game (same as shuffle), which was confusing mid-game
+  $(t, '332:3753').style.display = 'none';
+  const letters = shuffle(pool()).slice(0, pairs);
+  let misses = 0;
   letters.forEach(L => preload(`ph_${L}`));
   const deck = shuffle(letters.flatMap(L => [{ L, face: 'letter' }, { L, face: 'monster' }]));
   let open = [], matched = 0, busy = false;
@@ -80,7 +104,7 @@ route('memory', el => {
     setTimeout(() => { c.el.innerHTML = up ? faceHTML(c) : backHTML; c.el.classList.remove('flip-out'); c.el.classList.add('flip-in'); setTimeout(() => { c.el.classList.remove('flip-in'); res(); }, 170); }, 160);
   });
   deck.forEach((c, k) => {
-    c.el = box(CARD_X[k % 5], CARD_Y[Math.floor(k / 5)], 185, 228, 'bg-[#fbfdfe] rounded-[10px] shadow-[0px_6px_10px_0px_rgba(0,0,0,0.15)]', backHTML);
+    c.el = box(cardX(k % pairs), CARD_Y[Math.floor(k / pairs)], 185, 228, 'bg-[#fbfdfe] rounded-[10px] shadow-[0px_6px_10px_0px_rgba(0,0,0,0.15)]', backHTML);
     t.append(c.el);
     onTap(c.el, async () => {
       if (busy || c.up || c.done) return;
@@ -100,9 +124,10 @@ route('memory', el => {
         if (matched === letters.length) {
           await wait(600); await praise(true);
           store.completeGame('memory');
-          go('reward', { replay: ['memory', {}], done: ['minigames', {}] });
+          go('reward', { key: `memory_${stage}`, stars: misses <= pairs ? 3 : misses <= pairs * 2 ? 2 : 1, replay: ['memory', {}], done: ['minigames', {}] });
         }
       } else {
+        misses++;
         await wait(900); sfx('wrong', 0.5);
         await Promise.all([flip(a, false), flip(b, false)]);
         a.up = b.up = false; busy = false;
@@ -114,8 +139,10 @@ route('memory', el => {
 
 // ---------------- Blending Practice ----------------
 const BLEND_ROUNDS = 6;
+const BLEND_STAGES = [BLEND_GAME_WORDS, ['frog', 'crab', 'drum', 'flag', 'milk', 'nest', 'tent', 'lamp', 'duck'], ['plant', 'clock', 'snail', 'frog', 'crab', 'drum', 'nest', 'lamp']];
 route('blendgame', (el, { i = 0, words } = {}) => {
-  words ||= shuffle(BLEND_GAME_WORDS).slice(0, BLEND_ROUNDS);
+  const stage = stageOf('blend');
+  if (!words) { store.startRun(); words = shuffle(BLEND_STAGES[stage - 1]).slice(0, BLEND_ROUNDS); }
   const word = words[i], W = word.toUpperCase().split('');
   preload(`w_${slug(word)}`, ...W.map(L => `ph_${L}`));
   const t = tpl('blendgame');
@@ -123,6 +150,7 @@ route('blendgame', (el, { i = 0, words } = {}) => {
   music('games');
   ['598:4598', '598:4599', '598:4601', '598:4602', '598:4604', '603:1017', '314:474', '314:476', '314:477', '314:478', '322:629'].forEach(id => $(t, id)?.remove());
   lessonChrome(t, { exit: ['314:494'], gear: ['314:456'] }, { exit: back });
+  stagePill(t, stage, 62, 215);
   const hint = () => sayAll([`w_${slug(word)}`, ...W.map(L => `ph_${L}`)], 150);
   onTap($(t, '314:472'), hint);
   // picture
@@ -171,7 +199,7 @@ route('blendgame', (el, { i = 0, words } = {}) => {
     await praise(true);
     nextArrow(t, () => {
       if (i + 1 < words.length) go('blendgame', { i: i + 1, words });
-      else { store.completeGame('blend'); go('reward', { replay: ['blendgame', {}], done: ['minigames', {}] }); }
+      else { store.completeGame('blend'); go('reward', { key: `blend_${stage}`, replay: ['blendgame', {}], done: ['minigames', {}] }); }
     }).classList.add('pulse');
   }
   i === 0 ? sayAll(['ui_drag_spell', `w_${slug(word)}`]) : say(`w_${slug(word)}`);

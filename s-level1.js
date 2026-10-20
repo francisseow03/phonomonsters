@@ -45,8 +45,10 @@ route('level1', el => {
   strip.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse') d = { x: e.clientX, s: strip.scrollLeft, moved: false }; });
   strip.addEventListener('pointermove', e => { if (!d) return; if (Math.abs(e.clientX - d.x) > 6) d.moved = true; strip.scrollLeft = d.s - (e.clientX - d.x); });
   strip.addEventListener('click', e => { if (d?.moved) { e.stopPropagation(); e.preventDefault(); } d = null; }, true);
-  addEventListener('pointerup', () => { if (d && !d.moved) d = null; });
+  const up = () => { if (d && !d.moved) d = null; };
+  addEventListener('pointerup', up);
   say('ui_l1');
+  return () => removeEventListener('pointerup', up);
 });
 
 route('letter', (el, { L, step = 1 }) => {
@@ -55,6 +57,7 @@ route('letter', (el, { L, step = 1 }) => {
   music('learn');
   const exit = () => go('level1');
   if (step === 1) {
+    store.startRun();
     const t = tpl('l1card');
     el.append(t);
     t.classList.remove('cursor-pointer');
@@ -78,6 +81,8 @@ route('letter', (el, { L, step = 1 }) => {
     const mon = $(t, '286:183');
     mon.classList.remove('overflow-clip');
     mon.classList.add('float');
+    // the Figma frame sits the pair high in the card; centre them vertically
+    [mon, $(t, '286:165')].forEach(n => { n.style.marginTop = '36px'; });
     onTap(mon, () => { sfx('giggle'); mon.classList.add('wiggle'); setTimeout(() => mon.classList.remove('wiggle'), 600); say(`snd_${L}`); }, { sound: null });
     onTap($(t, '286:165'), () => say(`snd_${L}`));
     lessonChrome(t, { exit: ['307:210'], gear: ['286:167'], pause: ['286:166', '286:169'], help: ['303:272', '303:278'] }, { exit, help: () => infoPopup(L, MONSTERS[L].fact) });
@@ -89,9 +94,8 @@ route('letter', (el, { L, step = 1 }) => {
   if (step === 3) {
     const t = tpl('l1trace');
     el.append(t);
-    const txt = $(t, '287:309').querySelector('p');
-    txt.textContent = `${L} ${l}`;
-    txt.style.cssText = '-webkit-text-stroke: 6px #109586; paint-order: stroke fill;';
+    // the guide letters are drawn by the tracer canvas so they line up exactly with its hit mask
+    $(t, '287:309').style.visibility = 'hidden';
     lessonChrome(t, { exit: ['307:211'], gear: ['287:311'], pause: ['287:310', '287:313'], help: ['303:273', '303:276'] }, { exit, help: () => infoPopup(L, MONSTERS[L].fact) });
     const nextBtns = [$(t, '287:304'), $(t, '287:305')];
     nextBtns.forEach(b => { b.style.opacity = 0.35; });
@@ -108,19 +112,30 @@ function animate281(t) { const n = $(t, '281:227'); n.classList.add('bounce'); s
 /** Finger tracing over the outlined letters. Calls done() once enough of the glyphs are covered. */
 function tracer(t, text, done) {
   const X = 116, Y = 161, W = 963, H = 553;
-  const cv = h('canvas', 'absolute z-10');
-  cv.width = W; cv.height = H;
-  Object.assign(cv.style, { left: X + 'px', top: Y + 'px', width: W + 'px', height: H + 'px', touchAction: 'none', cursor: 'crosshair' });
-  t.append(cv);
+  const mk = z => { const c = h('canvas', 'absolute'); c.width = W; c.height = H; Object.assign(c.style, { left: X + 'px', top: Y + 'px', width: W + 'px', height: H + 'px', zIndex: z }); t.append(c); return c; };
+  const guide = mk(5);
+  guide.style.pointerEvents = 'none';
+  const cv = mk(10);
+  Object.assign(cv.style, { touchAction: 'none', cursor: 'crosshair' });
   const g = cv.getContext('2d');
   g.lineCap = g.lineJoin = 'round'; g.lineWidth = 34; g.strokeStyle = '#109586';
-  // glyph mask, drawn the same way the DOM renders the text (centered, 500px Cal Sans)
+  // guide glyphs and the coverage mask come from the same text metrics, so they always line up
   const mask = document.createElement('canvas'); mask.width = W; mask.height = H;
   const mg = mask.getContext('2d');
   let maskData = null, glyphPx = 1;
-  document.fonts.load('500px "Cal Sans"').then(() => {
-    mg.font = '500px "Cal Sans", sans-serif'; mg.textAlign = 'center'; mg.textBaseline = 'middle';
-    mg.lineWidth = 40; mg.strokeText(text, W / 2, H / 2 + 10); mg.fillText(text, W / 2, H / 2 + 10);
+  document.fonts.load('500px "Cal Sans"').catch(() => {}).then(() => {
+    const gg = guide.getContext('2d');
+    let size = 500;
+    const font = () => `${size}px "Cal Sans", Fredoka, sans-serif`;
+    gg.font = font();
+    while (size > 260 && gg.measureText(text).width > W - 80) { size -= 20; gg.font = font(); }
+    const m = gg.measureText(text);
+    // centre the glyph box (not the em box) in the card
+    const cy = H / 2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+    for (const c of [gg, mg]) { c.font = font(); c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round'; }
+    gg.fillStyle = '#aee3e3'; gg.strokeStyle = '#109586'; gg.lineWidth = 4;
+    gg.fillText(text, W / 2, cy); gg.strokeText(text, W / 2, cy);
+    mg.lineWidth = 40; mg.strokeText(text, W / 2, cy); mg.fillText(text, W / 2, cy);
     maskData = mg.getImageData(0, 0, W, H).data;
     for (let i = 3; i < maskData.length; i += 4 * 16) if (maskData[i] > 0) glyphPx++;
   });
@@ -162,7 +177,7 @@ function complete(L) {
   say(first ? 'ui_unlocked' : 'praise_0');
   const nextL = String.fromCharCode(L.charCodeAt(0) + 1);
   let gone = false;
-  const goReward = () => { if (gone) return; gone = true; o.close(); go('reward', { replay: ['letter', { L, step: 1 }], done: ['level1', {}], next: nextL <= 'Z' ? ['letter', { L: nextL, step: 1 }] : null }); };
+  const goReward = () => { if (gone) return; gone = true; o.close(); go('reward', { key: `l1_${L}`, replay: ['letter', { L, step: 1 }], done: ['level1', {}], next: nextL <= 'Z' ? ['letter', { L: nextL, step: 1 }] : null }); };
   setTimeout(goReward, 3200);
   onTap(o.el, goReward, { sound: null, cls: 'cursor-pointer' });
 }
