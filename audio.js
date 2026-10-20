@@ -91,14 +91,16 @@ function tts(text, my, onWord) {
     };
     currentRes = finish; speaking = true; ttsActive = true; applySettings();
     startedAt = ctx.currentTime;
-    // engines without voices never fire onend; give up after a reading-speed estimate
-    timer = setTimeout(() => finish(true), 1200 + text.length * 95);
+    // engines without voices never fire onstart/onend: give up if speech has not started in 2.5s;
+    // once it starts, only a generous reading-time cap applies so slow voices are not cut off
+    timer = setTimeout(() => finish(true), !synth || !s.narrationOn ? 1200 + text.length * 95 : 2500);
     if (!synth || !s.narrationOn) return;
     try {
       synth.cancel();
       const u = new SpeechSynthesisUtterance(text);
       u.lang = 'en-US'; u.rate = 0.82; u.pitch = 1.15; u.volume = Math.max(0, Math.min(1, s.narration));
       const v = pickVoice(); if (v) u.voice = v;
+      u.onstart = () => { clearTimeout(timer); timer = setTimeout(() => finish(true), 5000 + text.length * 200); };
       u.onend = () => finish(true);
       u.onerror = () => finish(true);
       if (onWord) u.onboundary = e => { if (!e.name || e.name === 'word') onWord(e.charIndex); };

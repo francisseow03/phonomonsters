@@ -6,11 +6,11 @@ import { music, say, sfx, wait, speak } from './audio.js';
 import { settingsPopup } from './ui.js';
 import { coinSvg, checkBadges } from './game.js';
 
-route('reward', (el, { replay, done, next, key = 'misc', stars: fixed }) => {
+route('reward', (el, { replay, done, next, key = 'misc', stars: fixed, practice }) => {
   const t = tpl('reward');
   el.append(t);
   music('menu');
-  const res = store.finishRun(key, { stars: fixed });
+  const res = store.finishRun(key, { stars: fixed, practice });
   const stars = ['430:374', '429:385', '430:368'].map(id => $(t, id)); // left, middle, right
   stars.forEach(s => { s.style.opacity = 0; });
   // coins + player level under the banner

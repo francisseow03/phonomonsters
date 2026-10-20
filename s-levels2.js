@@ -21,6 +21,7 @@ registerLines({
 });
 DIGRAPHS.forEach(g => registerLines({ [`dg_${g.d}`]: g.say }));
 
+const SPEAKER = `<svg viewBox="0 0 140 140" width="140" height="140"><circle cx="70" cy="74" r="66" fill="#018cbc"/><circle cx="70" cy="68" r="66" fill="#1fa7e1"/><path d="M42 56h16l22-18v60L58 80H42z" fill="#fff"/><path d="M90 52q12 16 0 32M100 42q22 26 0 52" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/></svg>`;
 const starRow = n => `<span style="color:#ffc843;letter-spacing:2px">${'★'.repeat(n)}</span><span style="color:#d5dde0;letter-spacing:2px">${'★'.repeat(3 - n)}</span>`;
 
 // ---------------- Level 5 menu ----------------
@@ -133,12 +134,13 @@ route('l5', (el, P) => {
   dots.style.gap = '10px';
   for (let j = 0; j < Q; j++) dots.append(h('div', '', `<div style="width:18px;height:18px;border-radius:50%;background:${j < q ? '#ffc843' : j === q ? '#1fa7e1' : '#b3e8ff'}"></div>`));
   t.append(dots);
-  const spk = box(527, 240, 140, 140, '', `<svg viewBox="0 0 140 140" width="140" height="140"><circle cx="70" cy="74" r="66" fill="#018cbc"/><circle cx="70" cy="68" r="66" fill="#1fa7e1"/><path d="M42 56h16l22-18v60L58 80H42z" fill="#fff"/><path d="M90 52q12 16 0 32M100 42q22 26 0 52" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/></svg>`);
+  const spk = box(527, 240, 140, 140, '', SPEAKER);
   spk.style.cursor = 'pointer';
   t.append(spk);
   const hear = () => { animate(spk, 'bounce'); say(`w_${slug(item.w)}`); };
   onTap(spk, hear);
-  const opts = shuffle([item.d, ...shuffle(DIGRAPHS.map(x => x.d).filter(d => d !== item.d)).slice(0, 2)]);
+  // never offer a second team that is also in the word (chick has ch and ck)
+  const opts = shuffle([item.d, ...shuffle(DIGRAPHS.map(x => x.d).filter(d => d !== item.d && !item.w.includes(d))).slice(0, 2)]);
   const tw = 220, tg = 40, tx = (1194 - (3 * tw + 2 * tg)) / 2;
   let answered = false;
   opts.forEach((d, j) => {
@@ -178,7 +180,7 @@ function question() {
     const L = pick(LETTERS);
     return { type, prompt: `ph_${L}`, answer: L, options: shuffle([L, ...shuffle(LETTERS.filter(x => x !== L)).slice(0, 3)]) };
   }
-  const word = pick(type === 'mid' ? BOSS_WORDS.filter(w => w.length === 3) : BOSS_WORDS);
+  const word = pick(type === 'mid' ? BOSS_WORDS.filter(w => w.length === 3 && VOWELS.includes(w[1].toUpperCase())) : BOSS_WORDS);
   if (type === 'mid') {
     const v = word[1].toUpperCase();
     return { type, word, answer: v, options: shuffle([v, ...shuffle(VOWELS.filter(x => x !== v)).slice(0, 2)]) };
@@ -220,7 +222,7 @@ route('level6', (el, P = {}) => {
   const cx = 438;
   let prompt;
   if (q.type === 'sound') {
-    prompt = box(cx - 70, 240, 140, 140, '', `<svg viewBox="0 0 140 140" width="140" height="140"><circle cx="70" cy="74" r="66" fill="#018cbc"/><circle cx="70" cy="68" r="66" fill="#1fa7e1"/><path d="M42 56h16l22-18v60L58 80H42z" fill="#fff"/><path d="M90 52q12 16 0 32M100 42q22 26 0 52" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/></svg>`);
+    prompt = box(cx - 70, 240, 140, 140, '', SPEAKER);
   } else {
     prompt = box(cx - 100, 215, 200, 200, '', `<img src="${picSrc(q.word)}" style="width:100%;height:100%;object-fit:contain" alt="">`);
     if (q.type === 'mid') t.append(box(cx - 150, 412, 300, 70, '', `<div style="text-align:center;font:400 64px 'Cal Sans',Fredoka;color:#109586;letter-spacing:12px;line-height:70px">${q.word[0]}<span style="color:#fa96ba">_</span>${q.word[2]}</div>`));
@@ -236,7 +238,7 @@ route('level6', (el, P = {}) => {
     const tile = box(tx + j * (tw + tg), 500, tw, 120, 'pm-tile');
     tile.className = 'pm-tile';
     tile.style.fontSize = q.type === 'pic' ? '46px' : '80px';
-    tile.textContent = q.type === 'pic' ? o : o;
+    tile.textContent = o;
     t.append(tile);
     onTap(tile, async () => {
       if (answered) return;
@@ -265,8 +267,8 @@ route('level6', (el, P = {}) => {
       }
     }, { sound: null });
   });
-  if (!P.S) sayAll(['ui_l6', q.type === 'sound' ? 'ui_l6_sound' : q.type === 'mid' ? 'ui_l6_mid' : 'ui_l6_pic', ...(q.type === 'sound' ? [q.prompt] : q.type === 'mid' ? [`w_${slug(q.word)}`] : [])]);
-  else sayAll([q.type === 'sound' ? 'ui_l6_sound' : q.type === 'mid' ? 'ui_l6_mid' : 'ui_l6_pic', ...(q.type === 'sound' ? [q.prompt] : q.type === 'mid' ? [`w_${slug(q.word)}`] : [])]);
+  const lines = { sound: ['ui_l6_sound', q.prompt], mid: ['ui_l6_mid', `w_${slug(q.word)}`], pic: ['ui_l6_pic'] }[q.type];
+  sayAll(P.S ? lines : ['ui_l6', ...lines]);
 
   async function victory(t, boss) {
     boss.style.transition = 'transform 1s ease, opacity 1s ease';
