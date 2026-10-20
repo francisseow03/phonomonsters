@@ -2,7 +2,7 @@
 import { route, go, tpl, $, $$, h, box, onTap, shuffle, pick, animate } from './core.js';
 import * as store from './store.js';
 import { music, say, sayAll, sfx, preload, wait, stopVoice } from './audio.js';
-import { lessonChrome, nextArrow, swapForImage, monsterSrc, picSrc, draggable, inside } from './ui.js';
+import { lessonChrome, nextArrow, swapForImage, monsterSrc, picSrc, draggable, inside, fitText, wordGrid } from './ui.js';
 import { praise, tryAgain, micAttempt } from './feedback.js';
 import { L2_WORDS, L3_WORDS, L4_BLENDS, VOWELS, LETTERS } from './data.js';
 import { slug } from './voice.js';
@@ -38,6 +38,7 @@ route('l2', (el, P) => {
     ['420:720', '420:719', '420:721'].forEach(id => { $(t, id).style.marginLeft = '-20px'; });
     ['420:586', '420:677'].forEach(id => { const n = $(t, id); if (n) n.style.marginLeft = '-7px'; });
     swapForImage($(t, '420:677'), picSrc(word));
+    $(t, '420:677').style.pointerEvents = 'none'; // let taps on the picture reach the card that says the word
     const ids = ['420:720', '420:719', '420:721'];
     ids.forEach((id, k) => {
       const n = $(t, id); n.querySelector('p').textContent = W[k];
@@ -57,6 +58,7 @@ route('l2', (el, P) => {
   el.append(t);
   t.classList.remove('cursor-pointer');
   swapForImage($(t, '428:432'), picSrc(word));
+  $(t, '428:432').style.pointerEvents = 'none';
   onTap($(t, '418:343'), () => say(`w_${slug(word)}`));
   const letterIds = ['419:482', '419:481', '419:483'];
   letterIds.forEach((id, k) => { const n = $(t, id); n.querySelector('p').textContent = W[k]; onTap(n, () => say(`ph_${W[k]}`)); });
@@ -90,7 +92,7 @@ route('l2', (el, P) => {
         m.remove();
         boxes[target].classList.remove('pulse');
         boxes[target].innerHTML = `<img src="${monsterSrc(L)}" class="absolute inset-[14px] size-[calc(100%-28px)] object-contain pop" alt="">`;
-        $$(t, '.cursor-grab').forEach(o => { o.dataset.locked = 1; o.style.opacity = 0.35; });
+        $$(t, '.cursor-grab').forEach(o => { o.dataset.locked = 1; o.style.opacity = 0.35; o.style.pointerEvents = 'none'; });
         (async () => { await say(`ph_${L}`); await praise(true); await say(`w_${slug(word)}`); arrow.style.display = ''; arrow.classList.add('pulse'); })();
         return true;
       },
@@ -229,6 +231,7 @@ route('l4', (el, P) => {
       // the blend + buttons group sits ~30px left of the card centre in the Figma frame
       ['427:403', '427:411', '428:580', '428:582'].forEach(id => { $(t, id).style.marginLeft = '30px'; });
       $(t, '427:411').querySelector('p').textContent = blend.b;
+      fitText($(t, '427:411'), 460); // "mp" used to wrap onto two lines
       onTap($(t, '427:403'), () => say(`blend_${blend.b}`));
       onTap($(t, '427:411'), () => say(`blend_${blend.b}`));
       const mic = () => micAttempt(t, { x: 763, y: 455, w: 110, h: 100 }, blend.b, [blend.words[0], blend.b, ...blend.words]);
@@ -241,20 +244,15 @@ route('l4', (el, P) => {
   el.append(t);
   t.classList.remove('cursor-pointer');
   lessonChrome(t, { exit: ['428:600'], gear: ['428:597'], pause: ['428:596', '428:599'] }, { exit });
-  const ids = ['428:595', '428:625', '428:620', '428:626', '428:621', '428:627'];
+  ['428:595', '428:625', '428:620', '428:626', '428:621', '428:627'].forEach(id => $(t, id).remove());
   const heard = new Set();
-  const nodes = ids.map((id, k) => {
-    const n = $(t, id), p = n.querySelector('p');
-    p.textContent = blend.words[k];
-    p.style.color = '#57b8b6';
-    onTap(n, () => {
-      nodes.forEach(o => o.querySelector('p').style.color = '#57b8b6');
-      p.style.color = '#1fa7e1'; animate(n, 'bounce'); heard.add(k);
-      say(`w_${slug(blend.words[k])}`);
-      if (heard.size === ids.length) setTimeout(() => sfx('star'), 700);
-    });
-    return n;
-  });
+  const nodes = wordGrid(t, blend.words);
+  nodes.forEach((n, k) => onTap(n, () => {
+    nodes.forEach(o => { o.style.color = '#57b8b6'; });
+    n.style.color = '#1fa7e1'; animate(n, 'bounce'); heard.add(k);
+    say(`w_${slug(blend.words[k])}`);
+    if (heard.size === nodes.length) setTimeout(() => sfx('star'), 700);
+  }));
   const done = () => {
     if (i + 1 < set.length) go('l4', { ...P, i: i + 1, step: 'meet' });
     else { store.completeLesson(4); go('reward', { key: `l4_${diff}`, replay: ['level4', {}], done: ['discover', {}] }); }

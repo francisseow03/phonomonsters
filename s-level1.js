@@ -1,8 +1,8 @@
 // Level 1 "My First Sounds": letter grid -> letter card (hear/say) -> meet the monster -> trace -> unlock.
-import { route, go, tpl, $, $$, h, box, onTap, overlay, confetti, stagePoint } from './core.js';
+import { route, go, tpl, $, $$, h, box, onTap, overlay, confetti, stagePoint, animate } from './core.js';
 import * as store from './store.js';
 import { music, say, sayAll, sfx, preload, wait } from './audio.js';
-import { lessonChrome, infoPopup, nextArrow, swapForImage, monsterSrc } from './ui.js';
+import { lessonChrome, infoPopup, nextArrow, swapForImage, monsterSrc, fitText } from './ui.js';
 import { micAttempt, praise } from './feedback.js';
 import { MONSTERS } from './data.js';
 
@@ -62,6 +62,7 @@ route('letter', (el, { L, step = 1 }) => {
     el.append(t);
     t.classList.remove('cursor-pointer');
     $(t, '281:227').querySelector('p').textContent = L + l;
+    fitText($(t, '281:227'), 860); // "Mm" and "Ww" used to wrap onto two lines
     lessonChrome(t, { exit: ['307:212'], gear: ['282:128'], pause: ['637:706'] }, { exit });
     onTap($(t, '275:189'), () => { say(`snd_${L}`); animate281(t); });
     const mic = () => micAttempt(t, { x: 624, y: 560, w: 100, h: 96 }, L, [MONSTERS[L].word, l, L, MONSTERS[L].say, `letter ${l}`]);
@@ -76,6 +77,7 @@ route('letter', (el, { L, step = 1 }) => {
     el.append(t);
     t.classList.remove('cursor-pointer');
     $(t, '286:165').querySelector('p').textContent = L + l;
+    fitText($(t, '286:165'), 540);
     $(t, '286:162').remove();
     const art = swapForImage($(t, '286:183'), monsterSrc(L));
     const mon = $(t, '286:183');
@@ -83,7 +85,7 @@ route('letter', (el, { L, step = 1 }) => {
     mon.classList.add('float');
     // the Figma frame sits the pair high in the card; centre them vertically
     [mon, $(t, '286:165')].forEach(n => { n.style.marginTop = '36px'; });
-    onTap(mon, () => { sfx('giggle'); mon.classList.add('wiggle'); setTimeout(() => mon.classList.remove('wiggle'), 600); say(`snd_${L}`); }, { sound: null });
+    onTap(mon, () => { sfx('giggle'); animate(art, 'wiggle'); say(`snd_${L}`); }, { sound: null }); // art = the picture inside the floating box
     onTap($(t, '286:165'), () => say(`snd_${L}`));
     lessonChrome(t, { exit: ['307:210'], gear: ['286:167'], pause: ['286:166', '286:169'], help: ['303:272', '303:278'] }, { exit, help: () => infoPopup(L, MONSTERS[L].fact) });
     const next = () => go('letter', { L, step: 3 });

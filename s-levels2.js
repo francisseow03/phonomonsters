@@ -2,7 +2,7 @@
 import { route, go, tpl, $, $$, h, box, onTap, shuffle, pick, animate, overlay, confetti } from './core.js';
 import * as store from './store.js';
 import { music, say, sayAll, sfx, wait, speak, stopVoice, registerLines } from './audio.js';
-import { lessonChrome, nextArrow, monsterSrc, picSrc } from './ui.js';
+import { lessonChrome, nextArrow, monsterSrc, picSrc, wordGrid } from './ui.js';
 import { praise, tryAgain } from './feedback.js';
 import { DIGRAPHS, BOSS_WORDS, VOWELS, LETTERS } from './data.js';
 import { slug } from './voice.js';
@@ -108,14 +108,8 @@ route('l5', (el, P) => {
     lessonChrome(t, { exit: ['428:600'], gear: ['428:597'], pause: ['428:596', '428:599'] }, { exit });
     // the Figma word slots are uneven; lay the six words out on an even 2 x 3 grid in the card
     ['428:595', '428:625', '428:620', '428:626', '428:621', '428:627'].forEach(id => $(t, id).remove());
-    g.words.forEach((w, j) => {
-      const at = w.indexOf(g.d);
-      const n = box(j % 2 ? 617 : 237, 196 + Math.floor(j / 2) * 160, 340, 140, '');
-      n.style.cssText += "display:flex;align-items:center;justify-content:center;cursor:pointer;font:400 100px 'Cal Sans',Fredoka,sans-serif;color:#57b8b6";
-      n.innerHTML = `<span>${w.slice(0, at)}<span style="color:${g.color}">${g.d}</span>${w.slice(at + 2)}</span>`;
-      t.append(n);
-      onTap(n, () => { animate(n, 'bounce'); say(`w_${slug(w)}`); });
-    });
+    const tint = w => { const at = w.indexOf(g.d); return `${w.slice(0, at)}<span style="color:${g.color}">${g.d}</span>${w.slice(at + 2)}`; };
+    wordGrid(t, g.words, tint).forEach((n, j) => onTap(n, () => { animate(n, 'bounce'); say(`w_${slug(g.words[j])}`); }));
     const go2 = () => next('quiz');
     onTap($(t, '428:590'), go2, { sound: 'nav' }); onTap($(t, '428:591'), go2, { sound: 'nav' });
     say('ui_word_list');
@@ -128,6 +122,7 @@ route('l5', (el, P) => {
   const item = pool[q];
   const t = tpl('l4blend');
   el.append(t);
+  el.dataset.answer = item.d; // lets automated play-throughs find the right tile
   lessonChrome(t, { exit: ['427:416'], gear: ['427:413'], pause: ['427:412', '427:415'] }, { exit });
   ['427:411', '427:403', '428:580', '428:582', '621:620', '621:621'].forEach(id => $(t, id).remove());
   const dots = box(497, 190, 200, 24, 'flex items-center justify-center');
@@ -154,7 +149,7 @@ route('l5', (el, P) => {
       if (d === item.d) {
         answered = true;
         store.recordAnswer(item.d, true);
-        tile.classList.add('good'); animate(tile, 'bounce');
+        tile.classList.add('good'); animate(tile, 'hop');
         const w = item.w, at = w.indexOf(d);
         spk.innerHTML = `<div style="width:340px;margin-left:-100px;text-align:center;font:400 96px 'Cal Sans',Fredoka;color:#109586;line-height:140px">${w.slice(0, at)}<span style="color:${DIGRAPHS.find(x => x.d === d).color}">${d}</span>${w.slice(at + 2)}</div>`;
         await praise(q === Q - 1);
@@ -246,7 +241,7 @@ route('level6', (el, P = {}) => {
       const right = o === q.answer;
       store.recordAnswer(q.type === 'sound' || q.type === 'mid' ? q.answer : q.word[0].toUpperCase(), right);
       if (right) {
-        tile.classList.add('good');
+        tile.classList.add('good'); animate(tile, 'hop');
         S.hp--; S.n++;
         sfx('correct'); boss.classList.remove('float'); animate(boss, 'pm-hit');
         hp.querySelector('i').style.width = `${100 * S.hp / maxHp}%`;

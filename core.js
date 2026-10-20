@@ -42,12 +42,32 @@ export async function go(name, params = {}) {
   // a controller that redirected (or a newer tap) has already replaced this screen
   if (my !== navSeq) { el.remove(); if (typeof cleanup === 'function') try { cleanup(); } catch {} return; }
   active.cleanup = typeof cleanup === 'function' ? cleanup : null;
+  passThroughIcons(el);
   await imagesReady(el, 700);
   if (my !== navSeq) return;
   el.classList.remove('pending');
   el.classList.add('enter');
   setTimeout(() => old.forEach(s => s.remove()), 400);
   window.scrollTo(0, 0);
+}
+
+/**
+ * Figma often draws a button's icon as a separate layer on top of the button, so a tap in the
+ * middle of the icon never reached the button. Let taps fall through such decorations.
+ */
+function passThroughIcons(root) {
+  const btns = [...root.querySelectorAll('[role=button]')];
+  if (!btns.length) return;
+  const rects = btns.map(b => b.getBoundingClientRect());
+  const holders = new Set(); // buttons and everything that contains one
+  for (const b of btns) for (let x = b; x && x !== root; x = x.parentElement) holders.add(x);
+  for (const e of root.querySelectorAll('div,img,svg,p')) {
+    if (holders.has(e) || e.closest('[role=button]')) continue;
+    const r = e.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) continue;
+    const i = rects.findIndex(b => r.left >= b.left - 6 && r.right <= b.right + 6 && r.top >= b.top - 6 && r.bottom <= b.bottom + 6);
+    if (i >= 0 && btns[i].compareDocumentPosition(e) & Node.DOCUMENT_POSITION_FOLLOWING) e.style.pointerEvents = 'none';
+  }
 }
 
 /** Fresh DOM copy of a converted Figma screen. */

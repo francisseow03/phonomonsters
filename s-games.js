@@ -49,15 +49,17 @@ route('soundgame', (el, { round = 0, score = 0 } = {}) => {
   onTap($(t, '312:295'), play);
   onTap(mon, play, { sound: 'giggle' });
   tiles.forEach((id, k) => {
-    const tile = $(t, id), txt = $(t, texts[k]);
-    txt.querySelector('p').textContent = opts[k];
-    txt.style.pointerEvents = 'none';
+    // the Figma letter is a separate layer from its box; put it inside the box so they press,
+    // hop and shake together
+    const tile = $(t, id);
+    $(t, texts[k]).remove();
+    tile.innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:400 100px 'Cal Sans',Fredoka,sans-serif;color:#fcfeff;pointer-events:none">${opts[k]}</div>`;
     onTap(tile, async () => {
       if (answered) return;
       if (opts[k] === L) {
         answered = true;
         store.recordAnswer(L, true);
-        animate(tile, 'bounce'); animate(mon, 'bounce');
+        animate(tile, 'hop'); animate(mon, 'bounce');
         monImg.style.filter = '';
         await praise();
         await wait(300);
@@ -119,7 +121,7 @@ route('memory', el => {
         a.done = b.done = true; matched++;
         store.recordAnswer(a.L, true);
         await wait(500); sfx('match');
-        [a, b].forEach(x => { x.el.classList.add('glow'); animate(x.el, 'bounce'); });
+        [a, b].forEach(x => { x.el.classList.add('glow'); animate(x.el, 'hop'); });
         busy = false;
         if (matched === letters.length) {
           await wait(600); await praise(true);
@@ -192,7 +194,8 @@ route('blendgame', (el, { i = 0, words } = {}) => {
     });
   });
   async function finish() {
-    $$(t, '.cursor-grab').forEach(o => { o.dataset.locked = 1; o.style.opacity = 0.35; });
+    // leftovers fade back and stop catching taps (one sat on top of the next arrow)
+    $$(t, '.cursor-grab').forEach(o => { o.dataset.locked = 1; o.style.opacity = 0.35; o.style.pointerEvents = 'none'; });
     await wait(700);
     for (const s of slots) { s.el.innerHTML = `<div class="absolute inset-0 flex items-center justify-center"><p class="m-0 font-['Cal_Sans'] text-[#109586] leading-none pop" style="font-size:${size * 0.7}px">${s.L}</p></div>`; sfx('pop', 0.5); await wait(120); }
     await say(`w_${slug(word)}`);

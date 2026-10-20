@@ -1,5 +1,5 @@
 // Gamification UI: coin/level pill, badges, daily streak, treasure (avatar) shop.
-import { h, box, onTap, overlay, stage, confetti, toast } from './core.js';
+import { h, box, onTap, overlay, stage, confetti, toast, animate } from './core.js';
 import * as store from './store.js';
 import { sfx, say, speak, isSpeaking } from './audio.js';
 import { LETTERS, VOWELS } from './data.js';
@@ -130,11 +130,20 @@ let avatarRenderer = null;
 export function onAvatarChange(fn) { avatarRenderer = fn; }
 function refreshAvatars() { avatarRenderer && avatarRenderer(); }
 
-/** Grey lock panel over a level/story card. */
-export function lockOver(root, x, y, w, hh, need, onTap_) {
-  const l = box(x, y, w, hh, 'pm-lock', `${lockSvg(70)}<div>Locked</div><div class="need">${need}</div>`);
-  l.className = 'pm-lock';
-  root.append(l);
-  onTap(l, () => { onTap_ && onTap_(); l.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-10px)' }, { transform: 'translateX(10px)' }, { transform: 'translateX(0)' }], { duration: 350 }); speak(`This level is locked. ${need} to open it.`); }, { sound: 'locked' });
-  return l;
+/**
+ * Lock a level card (261 x 275 at x, 293): the lock sits in the card's picture box with the
+ * same 20px inset as the artwork, and the card's Play button is greyed out.
+ */
+export function lockLevel(root, x, need, playEls = []) {
+  const panel = box(x + 19, 372, 223, 182, '');
+  panel.className = 'pm-lockpanel';
+  panel.innerHTML = `${lockSvg(58)}<b>Locked</b><div>${need}</div>`;
+  root.append(panel);
+  playEls.forEach(e => e && e.classList.add('pm-locked-play'));
+  // the whole card (and its Play button) explains what opens it
+  const hit = box(x, 293, 261, 330, '');
+  hit.style.zIndex = 16;
+  root.append(hit);
+  onTap(hit, () => { animate(panel, 'shake'); speak(`This level is locked. ${need} to open it.`); }, { sound: 'locked', cls: 'cursor-pointer' });
+  return panel;
 }
