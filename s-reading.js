@@ -109,7 +109,7 @@ route('story', (el, { s = 1, p = 1 }) => {
   $(t, '96:182') && ($(t, '96:182').style.pointerEvents = 'none');
   const next = () => {
     if (p < story.pages.length) go('story', { s, p: p + 1 });
-    else { store.completeStory(s); go('reward', { key: `story_${s}`, stars: 3, replay: ['story', { s, p: 1 }], done: ['reading', {}] }); }
+    else { store.completeStory(s); go('reward', { key: `story_${s}`, practice: true, replay: ['story', { s, p: 1 }], done: ['reading', {}] }); }
   };
   onTap($(t, '300:171'), next, { sound: 'page' }); onTap($(t, '300:172'), next, { sound: 'page' });
   if (p > 1) {
@@ -175,7 +175,7 @@ route('tale', (el, { s = 2, p = 1 }) => {
   if (p > 1) btn(889, 713, ARROW('M53 37.5H23M35 24L21.5 37.5 35 51'), () => go('tale', { s, p: p - 1 }), 'page');
   btn(1074, 713, ARROW('M22 37.5h30M40 24l13.5 13.5L40 51'), () => {
     if (p < st.pages.length) go('tale', { s, p: p + 1 });
-    else { store.completeStory(s); go('reward', { key: `story_${s}`, stars: 3, replay: ['tale', { s, p: 1 }], done: ['reading', {}] }); }
+    else { store.completeStory(s); go('reward', { key: `story_${s}`, practice: true, replay: ['tale', { s, p: 1 }], done: ['reading', {}] }); }
   }, 'page');
   const timer = setTimeout(read, 500);
   return () => clearTimeout(timer);

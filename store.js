@@ -26,8 +26,11 @@ const newProgress = () => ({
   allLevels: false,   // grown-up override: every level open
 });
 
-// older saves are missing the newer fields
+// older saves are missing the newer fields (checked once per progress object)
+const upgraded = new WeakSet();
 function upgrade(p) {
+  if (upgraded.has(p)) return p;
+  upgraded.add(p);
   const fresh = newProgress();
   for (const k of Object.keys(fresh)) if (p[k] === undefined) p[k] = fresh[k];
   for (const k of Object.keys(fresh.levels)) p.levels[k] ??= 0;
@@ -151,19 +154,12 @@ export function recordAnswer(L, right) {
 // A "run" is one lesson / game from its first screen to the reward page.
 const run = { right: 0, wrong: 0 };
 export function startRun() { run.right = 0; run.wrong = 0; }
-export const runMistakes = () => run.wrong;
-export function mistake() { run.wrong++; }
 
 /** Player level from lifetime XP: each level needs a little more than the last. */
 export function levelInfo(xp = progress().xp) {
   let lv = 1, need = 40, base = 0;
   while (xp >= base + need) { base += need; lv++; need = 40 + (lv - 1) * 20; }
   return { level: lv, into: xp - base, need, frac: (xp - base) / need };
-}
-export function addCoins(n) {
-  const p = progress();
-  p.coins += n; if (n > 0) p.xp += n;
-  save();
 }
 export function spendCoins(n) {
   const p = progress();
@@ -175,15 +171,16 @@ export function spendCoins(n) {
  * Close the current run: rate it 1-3 stars from the mistakes made, pay out coins/XP.
  * @returns {{stars:number, coins:number, firstTime:boolean, before:object, after:object}}
  */
-export function finishRun(key, { stars } = {}) {
+export function finishRun(key, { stars, practice = false } = {}) {
   const p = progress();
   stars ??= run.wrong === 0 ? 3 : run.wrong <= 2 ? 2 : 1;
   const prev = p.best[key] || 0;
   const firstTime = !prev;
   const before = levelInfo(p.xp);
-  let coins = 5 + stars * 5 + (firstTime ? 10 : 0) + Math.min(10, run.right);
+  // practice runs (story read-alongs) have nothing to get wrong: small reward, no Superstar credit
+  const coins = practice ? 5 + (firstTime ? 10 : 0) : 5 + stars * 5 + (firstTime ? 10 : 0) + Math.min(10, run.right);
   if (stars > prev) p.best[key] = stars;
-  if (stars === 3) p.perfect++;
+  if (stars === 3 && !practice) p.perfect++;
   p.coins += coins; p.xp += coins;
   startRun();
   save();
@@ -220,7 +217,8 @@ export const LEVEL_GATES = {
   5: { text: 'Finish 2 lessons in Level 4', test: p => p.levels[4] >= 2 },
   6: { text: 'Finish 2 lessons in Level 5', test: p => p.levels[5] >= 2 },
 };
-export function levelOpen(n) { const p = progress(), g = LEVEL_GATES[n]; return !g || p.allLevels || g.test(p); }
+// a level the child has already played stays open (saves from before the gates existed)
+export function levelOpen(n) { const p = progress(), g = LEVEL_GATES[n]; return !g || p.allLevels || p.levels[n] > 0 || g.test(p); }
 export function addMinute() {
   if (!profile()) return;
   const p = progress(); const d = today();

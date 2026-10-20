@@ -1,7 +1,7 @@
 // Gamification UI: coin/level pill, badges, daily streak, treasure (avatar) shop.
 import { h, box, onTap, overlay, stage, confetti, toast } from './core.js';
 import * as store from './store.js';
-import { sfx, say, speak } from './audio.js';
+import { sfx, say, speak, isSpeaking } from './audio.js';
 import { LETTERS, VOWELS } from './data.js';
 
 export const coinSvg = (s = 34) => `<svg class="pm-coin" viewBox="0 0 40 40" width="${s}" height="${s}"><circle cx="20" cy="22" r="17" fill="#e8a800"/><circle cx="20" cy="19" r="17" fill="#ffc843"/><circle cx="20" cy="19" r="12" fill="none" stroke="#fff3c4" stroke-width="3"/><path d="M20 11.5l2.3 4.8 5.2.6-3.9 3.6 1 5.2-4.6-2.6-4.6 2.6 1-5.2-3.9-3.6 5.2-.6z" fill="#fff"/></svg>`;
@@ -35,7 +35,9 @@ export function checkBadges() {
   fresh.forEach((b, i) => setTimeout(() => announce(b), 600 + i * 2600));
   return fresh;
 }
-function announce(b) {
+async function announce(b) {
+  // let current narration (lesson complete, streak, level up) finish first; give up waiting after ~6s
+  for (let i = 0; i < 30 && isSpeaking(); i++) await new Promise(r => setTimeout(r, 200));
   const t = h('div', 'pm-toastbadge', `<div class="ic">${b.icon}</div><div><small>New badge!</small><b>${b.name}</b></div>`);
   stage.append(t);
   sfx('unlock'); confetti(30);
