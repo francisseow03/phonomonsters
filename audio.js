@@ -31,7 +31,8 @@ document.addEventListener('visibilitychange', () => { document.hidden ? ctx.susp
 export function applySettings() {
   const s = settings();
   const t = ctx.currentTime;
-  musicBus.gain.setTargetAtTime(s.musicOn ? s.music * (speaking ? 0.35 : 1) : 0, t, 0.15);
+  // squared curve: the low end of the slider is where it matters; background music sits well under the voice
+  musicBus.gain.setTargetAtTime(s.musicOn ? s.music * s.music * 0.5 * (speaking ? 0.4 : 1) : 0, t, 0.15);
   sfxBus.gain.setTargetAtTime(s.sfxOn ? s.sfx : 0, t, 0.05);
   voiceBus.gain.setTargetAtTime(s.narrationOn ? s.narration : 0, t, 0.05);
 }

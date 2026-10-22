@@ -58,27 +58,38 @@ export function bindHeader(root) {
 
 // ---------- popups ----------
 export function settingsPopup() {
-  const { wrap, root } = frameCard('settingspop', 657, 547);
-  const o = overlay(wrap, { closeOnDim: true });
   const s = store.settings();
-  const slider = (fillId, knobId, trackId, key) => {
-    const fill = $(root, fillId), knob = $(root, knobId), track = $(root, trackId);
-    const set = v => {
-      v = Math.max(0, Math.min(1, v));
-      fill.style.width = 364 * v + 'px';
-      knob.style.left = 193 + 364 * v - 15 + 'px';
-      store.setSetting(key, v); applySettings();
-    };
-    set(s[key]);
-    const hit = box(180, key === 'sfx' ? 178 : 314, 390, 50, 'cursor-pointer z-10');
-    root.append(hit);
-    const move = e => set((stagePoint(e).x - stageRect(root).x - 193) / 364);
-    hit.addEventListener('pointerdown', e => { try { hit.setPointerCapture(e.pointerId); } catch {}; move(e); hit.onpointermove = move; });
-    hit.addEventListener('pointerup', () => { hit.onpointermove = null; key === 'sfx' ? sfx('pop') : say('ui_kid_hello'); });
+  const card = h('div', 'pm-card pop');
+  card.style.width = '640px';
+  card.innerHTML = '<h2>Settings</h2>';
+  const ICO = {
+    sfx: '<path d="M8 20h10l14-12v40L18 36H8z" fill="#fff"/><path d="M38 18q9 10 0 22M44 11q15 17 0 36" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>',
+    music: '<path d="M20 38V12l22-5v28" stroke="#fff" stroke-width="5" fill="none" stroke-linejoin="round"/><ellipse cx="14" cy="38" rx="8" ry="6" fill="#fff"/><ellipse cx="36" cy="35" rx="8" ry="6" fill="#fff"/>',
+    narration: '<path d="M30 6a9 9 0 0 1 9 9v13a9 9 0 0 1-18 0V15a9 9 0 0 1 9-9z" fill="#fff"/><path d="M14 26a16 16 0 0 0 32 0M30 42v10M22 52h16" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>',
   };
-  slider('631:826', '650:677', '631:825', 'sfx');
-  slider('631:829', '650:678', '631:828', 'narration');
-  onTap($(root, '631:822'), () => o.close());
+  const rows = [['sfx', 'Sound Effects', 'sfxOn'], ['music', 'Music', 'musicOn'], ['narration', 'Voice', 'narrationOn']];
+  for (const [key, label, onKey] of rows) {
+    const row = h('div', 'pm-slider', `<div class="ic"><svg viewBox="0 0 60 60" width="40" height="40">${ICO[key]}</svg></div>
+      <div class="body"><span>${label}</span><div class="track"><i></i><b></b></div></div><div class="mute"></div>`);
+    const track = row.querySelector('.track'), fill = track.querySelector('i'), knob = track.querySelector('b'), mute = row.querySelector('.mute');
+    const draw = () => {
+      const on = s[onKey] !== false, v = s[key];
+      fill.style.width = v * 100 + '%'; knob.style.left = v * 100 + '%';
+      row.classList.toggle('off', !on);
+      mute.textContent = on ? 'ON' : 'OFF';
+    };
+    const set = v => { v = Math.max(0, Math.min(1, v)); store.setSetting(key, v); if (v > 0 && s[onKey] === false) store.setSetting(onKey, true); draw(); applySettings(); };
+    const move = e => { const r = track.getBoundingClientRect(); set((e.clientX - r.left) / r.width); };
+    track.addEventListener('pointerdown', e => { try { track.setPointerCapture(e.pointerId); } catch {} move(e); track.onpointermove = move; });
+    track.addEventListener('pointerup', () => { track.onpointermove = null; key === 'sfx' ? sfx('pop') : key === 'narration' ? say('ui_kid_hello') : null; });
+    onTap(mute, () => { store.setSetting(onKey, s[onKey] === false); draw(); applySettings(); }, { sound: 'pop' });
+    draw();
+    card.append(row);
+  }
+  const done = h('div', 'pm-btn', 'DONE');
+  card.append(done);
+  const o = overlay(card, { closeOnDim: true });
+  onTap(done, () => o.close(), { sound: 'pop' });
   return o;
 }
 

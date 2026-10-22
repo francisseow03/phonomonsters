@@ -71,3 +71,16 @@
   align-items: center; gap: 4px; cursor: pointer; font-family: Nunito, sans-serif; }
 .pm-sheetopt b { font-size: 24px; font-weight: 900; color: #109586; }
 .pm-sheetopt span { font-size: 15px; color: #567; }
+
+/* ---------- settings sliders ---------- */
+.pm-slider { display: flex; align-items: center; gap: 16px; width: 100%; box-sizing: border-box; text-align: left; font-family: Nunito, sans-serif; }
+.pm-slider .ic { flex: none; width: 66px; height: 66px; border-radius: 50%; background: #01a4db; display: flex; align-items: center; justify-content: center; }
+.pm-slider .body { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.pm-slider .body span { font: 700 24px Nunito, sans-serif; color: #333; }
+.pm-slider .track { position: relative; height: 14px; border-radius: 60px; background: #b3e8ff; cursor: pointer; touch-action: none; margin-right: 15px; }
+.pm-slider .track::before { content: ""; position: absolute; left: -15px; right: -15px; top: -18px; bottom: -18px; }
+.pm-slider .track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 60px; background: #f9c105; pointer-events: none; }
+.pm-slider .track b { position: absolute; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: #f9c105; box-shadow: 0 2px 0 #d9a600; pointer-events: none; }
+.pm-slider .mute { flex: none; width: 64px; height: 40px; border-radius: 20px; background: #1c9886; color: #fff; font: 900 16px Nunito, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.pm-slider.off .mute { background: #b8c4c9; }
+.pm-slider.off .track i, .pm-slider.off .track b { background: #c9d3d6; box-shadow: none; }

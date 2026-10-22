@@ -5,7 +5,7 @@ import { GATE_TEXT } from './voice.js';
 
 const KEY = 'phonomonsters.v1';
 
-const DEFAULT_SETTINGS = { sfx: 0.9, narration: 0.95, music: 0.35, sfxOn: true, musicOn: true, narrationOn: true, parentalLock: true, screentime: 0 };
+const DEFAULT_SETTINGS = { sfx: 0.9, narration: 0.95, music: 0.3, sfxOn: true, musicOn: true, narrationOn: true, parentalLock: true, screentime: 0 };
 
 const newProgress = () => ({
   letters: {},        // L -> { done: true, at }
@@ -239,5 +239,9 @@ export function addMinute() {
 }
 
 // ---------- settings ----------
-export const settings = () => (db.settings ||= { ...DEFAULT_SETTINGS });
+export const settings = () => {
+  const s = (db.settings ||= { ...DEFAULT_SETTINGS });
+  if (s.musicVer !== 2) { s.music = Math.min(s.music ?? 0.3, 0.3); s.musicVer = 2; save(); } // music used to be far too loud
+  return s;
+};
 export function setSetting(k, v) { settings()[k] = v; save(); }
