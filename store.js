@@ -1,6 +1,8 @@
 // Local persistence (localStorage). Accounts, child profiles, progress, settings.
 // Everything stays on the device; no server needed for the prototype.
 
+import { GATE_TEXT } from './voice.js';
+
 const KEY = 'phonomonsters.v1';
 
 const DEFAULT_SETTINGS = { sfx: 0.9, narration: 0.95, music: 0.35, sfxOn: true, musicOn: true, narrationOn: true, parentalLock: true, screentime: 0 };
@@ -8,7 +10,7 @@ const DEFAULT_SETTINGS = { sfx: 0.9, narration: 0.95, music: 0.35, sfxOn: true, 
 const newProgress = () => ({
   letters: {},        // L -> { done: true, at }
   unlocked: [],       // monster letters unlocked
-  levels: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, // lessons completed per level
+  levels: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0 }, // lessons completed per level
   games: { blend: 0, sound: 0, memory: 0, story: 0 },
   accuracy: [],       // { key, score, at }
   results: {},        // L -> { right, wrong }
@@ -23,6 +25,9 @@ const newProgress = () => ({
   badges: {},         // badge id -> earned at
   streak: { last: null, count: 0, best: 0 },
   avatars: [],        // monster avatars bought in the treasure shop
+  hats: [],           // hats bought in the treasure shop
+  seenOpen: null,     // levels whose "now open" celebration has been shown
+  ver: 2,
   allLevels: false,   // grown-up override: every level open
 });
 
@@ -32,8 +37,11 @@ function upgrade(p) {
   if (upgraded.has(p)) return p;
   upgraded.add(p);
   const fresh = newProgress();
+  // v1 saves had the boss battle as Level 6; it is now Level 8 (6 and 7 are new levels)
+  if (!p.ver && p.levels) { p.levels[8] = p.levels[6] || 0; p.levels[6] = 0; }
   for (const k of Object.keys(fresh)) if (p[k] === undefined) p[k] = fresh[k];
   for (const k of Object.keys(fresh.levels)) p.levels[k] ??= 0;
+  p.ver = 2;
   return p;
 }
 
@@ -205,17 +213,21 @@ export function earnBadge(id) {
   if (p.badges[id]) return false;
   p.badges[id] = Date.now(); save(); return true;
 }
+export function ownHat(id) { const p = progress(); if (!p.hats.includes(id)) p.hats.push(id); save(); }
+export function setHat(id) { const pr = profile(); if (pr) { pr.hat = id; save(); } }
 export function ownAvatar(key) { const p = progress(); if (!p.avatars.includes(key)) p.avatars.push(key); save(); }
 export function setAvatar(key) { const pr = profile(); if (pr) { pr.avatar = key; save(); } }
 
 // Level gates: what has to be done before each level opens.
 export const LEVEL_GATES = {
   1: null,
-  2: { text: 'Learn 5 letters in Level 1', test: p => Object.keys(p.letters).length >= 5 },
-  3: { text: 'Finish 2 lessons in Level 2', test: p => p.levels[2] >= 2 },
-  4: { text: 'Finish 2 lessons in Level 3', test: p => p.levels[3] >= 2 },
-  5: { text: 'Finish 2 lessons in Level 4', test: p => p.levels[4] >= 2 },
-  6: { text: 'Finish 2 lessons in Level 5', test: p => p.levels[5] >= 2 },
+  2: { text: GATE_TEXT[2], test: p => Object.keys(p.letters).length >= 5 },
+  3: { text: GATE_TEXT[3], test: p => p.levels[2] >= 2 },
+  4: { text: GATE_TEXT[4], test: p => p.levels[3] >= 2 },
+  5: { text: GATE_TEXT[5], test: p => p.levels[4] >= 2 },
+  6: { text: GATE_TEXT[6], test: p => p.levels[5] >= 2 },
+  7: { text: GATE_TEXT[7], test: p => p.levels[6] >= 2 },
+  8: { text: GATE_TEXT[8], test: p => p.levels[7] >= 2 },
 };
 // a level the child has already played stays open (saves from before the gates existed)
 export function levelOpen(n) { const p = progress(), g = LEVEL_GATES[n]; return !g || p.allLevels || p.levels[n] > 0 || g.test(p); }

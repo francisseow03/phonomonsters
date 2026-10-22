@@ -29,7 +29,7 @@ export async function micAttempt(root, pos, key, expected) {
   try { r = await listen(key, expected); } finally { wv.remove(); busy = false; }
   if (r.verdict === 'great') { await praise(true); }
   else if (r.verdict === 'good') { sfx('star'); await say('ui_great_try'); }
-  else if (r.verdict === 'denied') toast('Please allow the microphone to practise speaking 🎤', 3000);
+  else if (r.verdict === 'denied') toast('Please allow the microphone to practise speaking', 3000);
   else toast('I could not hear you. Tap the mic and say it loud!', 2600);
   return r;
 }

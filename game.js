@@ -1,57 +1,42 @@
-// Gamification UI: coin/level pill, badges, daily streak, treasure (avatar) shop.
+// Gamification UI: coin/level pill, badges, daily streak, treasure shop (monsters + hats), level locks.
 import { h, box, onTap, overlay, stage, confetti, toast, animate } from './core.js';
 import * as store from './store.js';
-import { sfx, say, speak, isSpeaking } from './audio.js';
-import { LETTERS, VOWELS } from './data.js';
+import { sfx, say, isSpeaking, wait } from './audio.js';
+import { LETTERS, BADGES, HATS } from './data.js';
+import { medalSvg, hatSvg, ICON } from './art.js';
 
+export { BADGES };
 export const coinSvg = (s = 34) => `<svg class="pm-coin" viewBox="0 0 40 40" width="${s}" height="${s}"><circle cx="20" cy="22" r="17" fill="#e8a800"/><circle cx="20" cy="19" r="17" fill="#ffc843"/><circle cx="20" cy="19" r="12" fill="none" stroke="#fff3c4" stroke-width="3"/><path d="M20 11.5l2.3 4.8 5.2.6-3.9 3.6 1 5.2-4.6-2.6-4.6 2.6 1-5.2-3.9-3.6 5.2-.6z" fill="#fff"/></svg>`;
 export const lockSvg = (s = 64) => `<svg viewBox="0 0 64 64" width="${s}" height="${s}"><path d="M18 28v-8a14 14 0 0128 0v8" fill="none" stroke="#6b6b6b" stroke-width="7" stroke-linecap="round"/><rect x="10" y="27" width="44" height="32" rx="8" fill="#f9c105"/><rect x="10" y="27" width="44" height="10" rx="5" fill="#ffd84a"/><circle cx="32" cy="42" r="5" fill="#3a3a3a"/><rect x="29.5" y="44" width="5" height="9" rx="2.5" fill="#3a3a3a"/></svg>`;
 
 // ---------- badges ----------
-const lettersDone = p => Object.keys(p.letters).length;
-export const BADGES = [
-  { id: 'first_friend', icon: '🐣', name: 'First Friend', desc: 'Learn your first letter', test: p => lettersDone(p) >= 1 },
-  { id: 'monster_pal', icon: '🤝', name: 'Monster Pal', desc: 'Learn 5 letters', test: p => lettersDone(p) >= 5 },
-  { id: 'vowel_hero', icon: '🅰️', name: 'Vowel Hero', desc: 'Learn A, E, I, O and U', test: p => VOWELS.every(L => p.letters[L]) },
-  { id: 'alphabet_ace', icon: '🔤', name: 'Alphabet Ace', desc: 'Learn all 26 letters', test: p => LETTERS.every(L => p.letters[L]) },
-  { id: 'sound_sleuth', icon: '🔊', name: 'Sound Sleuth', desc: 'Finish Sound Practice 3 times', test: p => p.games.sound >= 3 },
-  { id: 'memory_master', icon: '🧠', name: 'Memory Master', desc: 'Finish Memory Matching 3 times', test: p => p.games.memory >= 3 },
-  { id: 'word_builder', icon: '🧱', name: 'Word Builder', desc: 'Finish Blending Practice 3 times', test: p => p.games.blend >= 3 },
-  { id: 'bookworm', icon: '📚', name: 'Bookworm', desc: 'Read 3 stories', test: p => (p.games.story || 0) >= 3 },
-  { id: 'train_driver', icon: '🚂', name: 'Train Driver', desc: 'Finish 3 Level 3 lessons', test: p => p.levels[3] >= 3 },
-  { id: 'blend_boss', icon: '🌀', name: 'Blend Boss', desc: 'Finish 3 Level 4 lessons', test: p => p.levels[4] >= 3 },
-  { id: 'digraph_detective', icon: '🔍', name: 'Digraph Detective', desc: 'Finish a Level 5 lesson', test: p => p.levels[5] >= 1 },
-  { id: 'word_wizard', icon: '🧙', name: 'Word Wizard', desc: 'Beat the Level 6 boss', test: p => p.levels[6] >= 1 },
-  { id: 'superstar', icon: '🌟', name: 'Superstar', desc: 'Get 3 stars 5 times', test: p => p.perfect >= 5 },
-  { id: 'streak_3', icon: '🔥', name: 'On Fire', desc: 'Play 3 days in a row', test: p => (p.streak.best || 0) >= 3 },
-  { id: 'streak_7', icon: '🏆', name: 'Super Streak', desc: 'Play 7 days in a row', test: p => (p.streak.best || 0) >= 7 },
-  { id: 'treasure', icon: '💰', name: 'Treasure Hunter', desc: 'Earn 300 coins', test: p => p.xp >= 300 },
-];
+const untilQuiet = async () => { for (let i = 0; i < 30 && isSpeaking(); i++) await wait(200); };
 
-/** Award any badges whose conditions are now met, announcing each one. */
+/** Award any badges whose conditions are now met; several at once share one announcement. */
 export function checkBadges() {
   const p = store.progress();
   const fresh = BADGES.filter(b => !p.badges[b.id] && b.test(p) && store.earnBadge(b.id));
-  fresh.forEach((b, i) => setTimeout(() => announce(b), 600 + i * 2600));
+  if (fresh.length) setTimeout(() => announce(fresh), 600);
   return fresh;
 }
-async function announce(b) {
-  // let current narration (lesson complete, streak, level up) finish first; give up waiting after ~6s
-  for (let i = 0; i < 30 && isSpeaking(); i++) await new Promise(r => setTimeout(r, 200));
-  const t = h('div', 'pm-toastbadge', `<div class="ic">${b.icon}</div><div><small>New badge!</small><b>${b.name}</b></div>`);
+async function announce(list) {
+  await untilQuiet(); // let lesson-complete / level-up narration finish first
+  const t = h('div', 'pm-toastbadge', `<div class="medals">${list.slice(0, 4).map(b => medalSvg(b, 58)).join('')}</div>
+    <div><small>${list.length > 1 ? `${list.length} new badges!` : 'New badge!'}</small><b>${list.length > 1 ? list.map(b => b.name).slice(0, 2).join(' + ') + (list.length > 2 ? ' + more' : '') : list[0].name}</b></div>`);
   stage.append(t);
-  sfx('unlock'); confetti(30);
-  speak(`New badge! ${b.name}!`);
-  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 400); }, 2300);
+  sfx('unlock'); confetti(30 + list.length * 15);
+  await say(list.length > 1 ? 'ui_badges_many' : `ui_badge_new_${list[0].id}`);
+  await wait(900);
+  t.classList.add('out'); setTimeout(() => t.remove(), 400);
 }
 
 export function badgeGrid(container) {
   const p = store.progress();
   for (const b of BADGES) {
     const got = !!p.badges[b.id];
-    const el = h('div', 'pm-badge' + (got ? '' : ' locked'), `<div class="ic">${b.icon}</div><b>${b.name}</b><span>${b.desc}</span>`);
+    const el = h('div', 'pm-badge' + (got ? '' : ' locked'), `<div class="ic">${medalSvg(b, 92, !got)}</div><b>${b.name}</b><span>${b.desc}</span>`);
     container.append(el);
-    onTap(el, () => speak(got ? `${b.name}! ${b.desc}.` : `To earn this badge: ${b.desc}.`), { sound: got ? 'sparkle' : 'locked' });
+    onTap(el, () => { animate(el.querySelector('.ic'), 'wiggle'); say(got ? `ui_badge_${b.id}` : `ui_badge_lock_${b.id}`); }, { sound: got ? 'sparkle' : 'locked' });
   }
 }
 
@@ -63,67 +48,84 @@ export function coinPill(root, x = 575, y = 46) {
   Object.assign(pill.style, { left: x + 'px', top: y + 'px', width: '150px', height: '77px', zIndex: 5 });
   root.append(pill);
   onTap(pill, () => treasureShop(() => {
-    const fresh = store.progress();
-    pill.querySelector('b').textContent = fresh.coins;
+    pill.querySelector('b').textContent = store.progress().coins;
   }), { sound: 'pop' });
   return pill;
 }
 
-// ---------- daily check-in ----------
+// ---------- daily streak: paid out with the first finished activity of the day ----------
+/** Resolves once the child has closed the streak card (or at once if today is already counted). */
 export function dailyCheckIn() {
   const r = store.checkIn();
-  if (!r) return;
-  const card = h('div', 'pm-card pop');
-  card.style.width = '560px';
-  const flames = Array.from({ length: Math.min(7, r.day) }, () => '🔥').join('');
-  card.innerHTML = `<h2>Day ${r.day} streak!</h2><div style="font-size:54px;line-height:1">${flames}</div>
-    <p>${r.day > 1 ? "Welcome back!" : "Hello, friend!"} Here is your daily treasure.</p>
-    <div class="pm-chip" style="font-size:30px;height:62px">${coinSvg(44)} +${r.bonus} coins</div>`;
-  const ok = h('div', 'pm-btn', 'YAY!');
-  card.append(ok);
-  const o = overlay(card, { closeOnDim: true });
-  onTap(ok, () => { o.close(); checkBadges(); }, { sound: 'sparkle' });
-  sfx('complete');
-  speak(r.day > 1 ? `Day ${r.day}! You are on a streak! Here are ${r.bonus} coins.` : `Welcome! Here are ${r.bonus} coins to start your day.`);
+  if (!r) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const card = h('div', 'pm-card pop');
+    card.style.width = '560px';
+    card.innerHTML = `<h2>Day ${r.day} streak!</h2><div class="pm-row" style="gap:6px">${Array.from({ length: Math.min(7, r.day) }, () => ICON.flame(58)).join('')}</div>
+      <p>${r.day > 1 ? 'You learnt something new again today!' : 'You learnt something new today!'} Here is your daily treasure.</p>
+      <div class="pm-chip" style="font-size:30px;height:62px">${coinSvg(44)} +${r.bonus} coins</div>`;
+    const ok = h('div', 'pm-btn', 'YAY!');
+    card.append(ok);
+    const o = overlay(card, { closeOnDim: true, onClose: () => resolve(true) });
+    onTap(ok, () => o.close(), { sound: 'sparkle' });
+    sfx('complete');
+    say(r.day === 1 ? 'ui_streak_1' : r.day <= 7 ? `ui_streak_${r.day}` : 'ui_streak_more');
+  });
 }
 
-// ---------- treasure shop: spend coins on monster avatars ----------
+// ---------- treasure shop: monster avatars and hats ----------
 const AVATAR_PRICE = 30;
-export function treasureShop(onChange) {
+export function treasureShop(onChange, tab = 'monsters') {
   const p = store.progress();
   const me = store.profile();
   const card = h('div', 'pm-card pop');
-  card.style.width = '900px';
-  card.innerHTML = `<h2>Treasure Shop</h2><p style="font-size:19px">Spend your coins on monster friends to use as your picture! Learn letters to find more.</p>`;
+  card.style.width = '940px';
+  card.innerHTML = `<h2>Treasure Shop</h2>`;
+  const top = h('div', 'pm-row');
+  top.style.alignItems = 'center';
   const bal = h('div', 'pm-chip', `${coinSvg(34)} <span>${p.coins}</span> coins`);
-  card.append(bal);
+  const tabs = ['monsters', 'hats'].map(k => {
+    const b = h('div', `pm-tab${k === tab ? ' on' : ''}`, k === 'monsters' ? 'Monster friends' : 'Hats');
+    onTap(b, () => { o.close(); treasureShop(onChange, k); }, { sound: 'nav' });
+    return b;
+  });
+  top.append(...tabs, bal);
+  card.append(top);
   const grid = h('div', 'pm-row');
-  grid.style.cssText = 'gap:14px;max-height:330px;overflow-y:auto;padding:6px 4px 10px';
-  const unlocked = LETTERS.filter(L => p.unlocked.includes(L));
-  if (!unlocked.length) grid.innerHTML = `<p style="font-size:20px;color:#1c9886;padding:30px 0">Learn letters in Level 1 to meet monsters for the shop!</p>`;
-  for (const L of unlocked) {
-    const key = 'm' + L;
-    const owned = p.avatars.includes(key);
-    const using = me?.avatar === key;
-    const cell = h('div', '', '');
-    cell.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;width:104px;cursor:pointer';
-    cell.innerHTML = `<div style="position:relative;width:92px;height:92px;border-radius:50%;background:#fff;box-shadow:${using ? '0 0 0 5px #fa96ba' : '0 4px 0 #b3e8ff'};overflow:hidden"><img src="m-${L}.png" alt="" style="position:absolute;width:150%;left:-25%;top:-4%;max-width:none"></div>
-      <div style="font:900 16px Nunito;color:${owned ? '#1c9886' : '#7a4b00'};display:flex;align-items:center;gap:4px">${using ? 'Using' : owned ? 'Use' : coinSvg(20) + AVATAR_PRICE}</div>`;
-    grid.append(cell);
-    onTap(cell, () => {
-      if (owned || using) { store.setAvatar(key); sfx('sparkle'); o.close(); onChange && onChange(); refreshAvatars(); return; }
-      if (!store.spendCoins(AVATAR_PRICE)) { sfx('locked'); toast(`You need ${AVATAR_PRICE} coins. Keep playing!`); return; }
-      store.ownAvatar(key); store.setAvatar(key);
-      sfx('unlock'); confetti(40); speak(`You got monster ${L}!`);
-      o.close(); onChange && onChange(); refreshAvatars();
-    }, { sound: null });
+  grid.style.cssText = 'gap:14px;max-height:340px;overflow-y:auto;padding:6px 4px 10px';
+  const done = () => { o.close(); onChange && onChange(); refreshAvatars(); };
+  const buy = (price, give, line) => {
+    if (!store.spendCoins(price)) { sfx('locked'); say('ui_need_coins'); toast(`You need ${price} coins. Keep playing!`); return; }
+    give(); sfx('unlock'); confetti(40); say(line); done();
+  };
+  const priceTag = (owned, using, price) => using ? 'Using' : owned ? 'Use' : coinSvg(20) + price;
+  if (tab === 'monsters') {
+    const unlocked = LETTERS.filter(L => p.unlocked.includes(L));
+    if (!unlocked.length) grid.innerHTML = `<p style="font-size:20px;color:#1c9886;padding:30px 0">Learn letters in Level 1 to meet monsters for the shop!</p>`;
+    for (const L of unlocked) {
+      const key = 'm' + L, owned = p.avatars.includes(key), using = me?.avatar === key;
+      const cell = h('div', 'pm-shopcell', `<div class="pic${using ? ' using' : ''}"><img src="m-${L}.png" alt="" style="position:absolute;width:150%;left:-25%;top:-4%;max-width:none"></div><div class="price${owned ? ' owned' : ''}">${priceTag(owned, using, AVATAR_PRICE)}</div>`);
+      grid.append(cell);
+      onTap(cell, () => (owned || using) ? (store.setAvatar(key), sfx('sparkle'), done()) : buy(AVATAR_PRICE, () => { store.ownAvatar(key); store.setAvatar(key); }, 'ui_got_friend'), { sound: null });
+    }
+  } else {
+    const off = h('div', 'pm-shopcell', `<div class="pic${!me?.hat ? ' using' : ''}" style="display:flex;align-items:center;justify-content:center;font:900 18px Nunito;color:#8aa">None</div><div class="price owned">${me?.hat ? 'Take off' : 'Using'}</div>`);
+    grid.append(off);
+    onTap(off, () => { store.setHat(null); sfx('pop'); done(); }, { sound: null });
+    for (const hat of HATS) {
+      const owned = p.hats.includes(hat.id), using = me?.hat === hat.id;
+      const cell = h('div', 'pm-shopcell', `<div class="pic${using ? ' using' : ''}" style="display:flex;align-items:center;justify-content:center">${hatSvg(hat.id, 80)}</div><div class="price${owned ? ' owned' : ''}">${priceTag(owned, using, hat.price)}</div>`);
+      cell.title = hat.name;
+      grid.append(cell);
+      onTap(cell, () => owned ? (store.setHat(hat.id), sfx('sparkle'), say('ui_got_hat'), done()) : buy(hat.price, () => { store.ownHat(hat.id); store.setHat(hat.id); }, 'ui_got_hat'), { sound: null });
+    }
   }
   card.append(grid);
   const close = h('div', 'pm-btn alt', 'CLOSE');
   card.append(close);
   const o = overlay(card, { closeOnDim: true });
   onTap(close, () => o.close(), { sound: 'nav' });
-  say('ui_shop');
+  say('ui_treasure');
 }
 // avatars in the header badge are drawn once per screen; redraw after a purchase
 let avatarRenderer = null;
@@ -134,7 +136,7 @@ function refreshAvatars() { avatarRenderer && avatarRenderer(); }
  * Lock a level card (261 x 275 at x, 293): the lock sits in the card's picture box with the
  * same 20px inset as the artwork, and the card's Play button is greyed out.
  */
-export function lockLevel(root, x, need, playEls = []) {
+export function lockLevel(root, x, need, playEls = [], n) {
   const panel = box(x + 19, 372, 223, 182, '');
   panel.className = 'pm-lockpanel';
   panel.innerHTML = `${lockSvg(58)}<b>Locked</b><div>${need}</div>`;
@@ -144,6 +146,6 @@ export function lockLevel(root, x, need, playEls = []) {
   const hit = box(x, 293, 261, 330, '');
   hit.style.zIndex = 16;
   root.append(hit);
-  onTap(hit, () => { animate(panel, 'shake'); speak(`This level is locked. ${need} to open it.`); }, { sound: 'locked', cls: 'cursor-pointer' });
+  onTap(hit, () => { animate(panel, 'shake'); say(`ui_lock_level_${n}`); }, { sound: 'locked', cls: 'cursor-pointer' });
   return panel;
 }

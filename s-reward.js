@@ -2,14 +2,17 @@
 // Rates the run 1-3 stars, pays out coins/XP, and announces level-ups and badges.
 import { route, go, tpl, $, h, onTap, confetti, overlay } from './core.js';
 import * as store from './store.js';
-import { music, say, sfx, wait, speak } from './audio.js';
+import { music, say, sfx, wait } from './audio.js';
 import { settingsPopup } from './ui.js';
-import { coinSvg, checkBadges } from './game.js';
+import { coinSvg, checkBadges, dailyCheckIn } from './game.js';
+import { ICON } from './art.js';
+import { monsterSrc } from './ui.js';
 
 route('reward', (el, { replay, done, next, key = 'misc', stars: fixed, practice }) => {
   const t = tpl('reward');
   el.append(t);
   music('menu');
+  const prevBest = store.progress().best[key] || 0;
   const res = store.finishRun(key, { stars: fixed, practice });
   const stars = ['430:374', '429:385', '430:368'].map(id => $(t, id)); // left, middle, right
   stars.forEach(s => { s.style.opacity = 0; });
@@ -40,8 +43,14 @@ route('reward', (el, { replay, done, next, key = 'misc', stars: fixed, practice 
     lvChip.querySelector('i').style.width = Math.round(lv.frac * 100) + '%';
     await wait(900);
     if (cancelled) return;
-    if (lv.level > res.before.level) levelUp(lv.level);
-    else checkBadges();
+    // the day's streak is counted with the first finished activity, then shiny monsters and level-ups
+    await dailyCheckIn();
+    if (cancelled) return;
+    const L = key.startsWith('l1_') && key.slice(3);
+    if (L && res.stars === 3 && prevBest < 3) await shiny(L);
+    if (cancelled) return;
+    if (lv.level > res.before.level) await levelUp(lv.level);
+    if (!cancelled) checkBadges();
   })();
   const doReplay = () => go(...replay);
   const doDone = () => go(...done);
@@ -60,14 +69,17 @@ route('reward', (el, { replay, done, next, key = 'misc', stars: fixed, practice 
   return () => { cancelled = true; };
 });
 
-function levelUp(level) {
+const popup = (html, btn, voice, sound = 'unlock') => new Promise(resolve => {
   const card = h('div', 'pm-card pop');
-  card.style.width = '520px';
-  card.innerHTML = `<div style="font-size:90px;line-height:1">🎉</div><h2>Level Up!</h2><p>You are now <b style="color:#fa96ba">Level ${level}</b>!</p>`;
-  const ok = h('div', 'pm-btn', 'AWESOME!');
+  card.style.width = '540px';
+  card.innerHTML = html;
+  const ok = h('div', 'pm-btn', btn);
   card.append(ok);
-  const o = overlay(card, { closeOnDim: true, onClose: () => checkBadges() });
+  const o = overlay(card, { closeOnDim: true, onClose: resolve });
   onTap(ok, () => o.close(), { sound: 'sparkle' });
-  sfx('unlock'); confetti(120);
-  speak(`Level up! You are now level ${level}!`);
-}
+  sfx(sound); confetti(120);
+  say(voice);
+});
+const levelUp = level => popup(`${ICON.party(96)}<h2>Level Up!</h2><p>You are now <b style="color:#fa96ba">Level ${level}</b>!</p>`, 'AWESOME!', `ui_levelup_${Math.min(40, level)}`);
+const shiny = L => popup(`<div class="pm-shiny" style="position:relative;width:220px;height:220px;border-radius:50%;display:flex;align-items:center;justify-content:center"><img src="${monsterSrc(L)}" style="height:190px" alt=""><div class="pm-sparkles">${ICON.sparkle(30)}${ICON.sparkle(20, '#fff')}${ICON.sparkle(26)}</div></div>
+  <h2>Monster ${L} is shiny!</h2><p>Three stars! Find your shiny monster in the PhonoDex.</p>`, 'WOW!', 'ui_shiny');

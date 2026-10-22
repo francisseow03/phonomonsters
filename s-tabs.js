@@ -1,10 +1,12 @@
 // Main tabs: Home, Discover, Minigames, PhonoDex (+ monster page), Shop.
-import { route, go, tpl, $, $$, h, box, onTap, overlay, toast, stagePoint, getScale, animate } from './core.js';
+import { route, go, tpl, $, $$, h, box, onTap, overlay, toast, stagePoint, getScale, animate, confetti } from './core.js';
 import * as store from './store.js';
 import { music, say, sfx, preload } from './audio.js';
 import { bindHeader, settingsPopup, parentGate, monsterSrc } from './ui.js';
 import { MONSTERS, LETTERS, VOWELS } from './data.js';
-import { dailyCheckIn, checkBadges, badgeGrid, lockLevel, lockSvg } from './game.js';
+import { checkBadges, badgeGrid, lockLevel, lockSvg } from './game.js';
+import { bossSvg, ICON } from './art.js';
+import { worksheets, productCard } from './shopitems.js';
 
 /** Horizontal drag-to-scroll for mouse users (touch scrolls natively). */
 function dragScroll(el) {
@@ -50,7 +52,7 @@ route('home', el => {
   });
   onTap($(t, '785:1108'), () => go('profiles'), { sound: 'nav' });
   say('ui_home');
-  const welcome = setTimeout(() => { if (store.profile()) { dailyCheckIn(); checkBadges(); } }, 700);
+  const welcome = setTimeout(() => { if (store.profile()) checkBadges(); }, 700);
   return () => { clearTimeout(welcome); stopDrag(); };
 });
 
@@ -64,7 +66,7 @@ route('discover', (el, { page = 1 } = {}) => {
   bindHeader(t);
   const pr = store.progress(), lv = pr.levels;
   const open = n => store.levelOpen(n);
-  const lock = (n, x, play) => lockLevel(t, x, store.LEVEL_GATES[n].text, play);
+  const lock = (n, x, play) => lockLevel(t, x, store.LEVEL_GATES[n].text, play, n);
   // the Figma Play button (+ its label) under each of the four level cards
   const PLAY = { 45: ['75:68', '60:103'], 326: ['75:70', '75:71'], 607: ['75:72', '75:74'], 888: ['75:73', '75:75'] };
   if (page === 1) {
@@ -85,8 +87,10 @@ route('discover', (el, { page = 1 } = {}) => {
   } else {
     CARD_NODES.forEach(id => $(t, id)?.remove());
     const cards = [
-      { n: 5, x: 326, color: '#a37fe8', dark: '#8a63d6', sub: 'Digraphs', art: `<img src="m-S.png" style="position:absolute;left:14px;bottom:8px;height:96px" alt=""><img src="m-H.png" style="position:absolute;right:14px;bottom:8px;height:96px" alt=""><div style="position:absolute;top:6px;left:0;right:0;text-align:center;font:400 80px 'Cal Sans',Fredoka;color:#a37fe8;line-height:1">sh</div>` },
-      { n: 6, x: 607, color: '#5b4a9b', dark: '#46397a', sub: 'Boss Battle', art: `<img src="m-N.png" style="height:160px;filter:hue-rotate(200deg) saturate(1.3)" alt=""><div style="position:absolute;top:2px;left:50%;transform:translateX(-50%) rotate(-8deg);font-size:46px">👑</div><div style="position:absolute;left:12px;top:12px;font:900 30px Nunito;color:#fb5063">VS</div>` },
+      { n: 5, x: 45, color: '#a37fe8', dark: '#8a63d6', sub: 'Digraphs', art: `<img src="m-S.png" style="position:absolute;left:14px;bottom:8px;height:96px" alt=""><img src="m-H.png" style="position:absolute;right:14px;bottom:8px;height:96px" alt=""><div style="position:absolute;top:6px;left:0;right:0;text-align:center;font:400 80px 'Cal Sans',Fredoka;color:#a37fe8;line-height:1">sh</div>` },
+      { n: 6, x: 326, color: '#ffb000', dark: '#e09600', sub: 'Vowel Teams', art: `<img src="m-E.png" style="position:absolute;left:14px;bottom:8px;height:96px" alt=""><img src="m-E.png" style="position:absolute;right:14px;bottom:8px;height:96px;transform:scaleX(-1)" alt=""><div style="position:absolute;top:6px;left:0;right:0;text-align:center;font:400 80px 'Cal Sans',Fredoka;color:#ffb000;line-height:1">ee</div>` },
+      { n: 7, x: 607, color: '#1fa7e1', dark: '#018cbc', sub: 'Tricky Words', art: `<img src="m-T.png" style="position:absolute;right:10px;bottom:8px;height:110px" alt=""><div style="position:absolute;top:14px;left:16px;text-align:left;font:400 50px/1 'Cal Sans',Fredoka;color:#1fa7e1">the<br>said<br><span style="color:#fa96ba">you</span></div>` },
+      { n: 8, x: 888, color: '#5b4a9b', dark: '#46397a', sub: 'Boss Battle', art: `<div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%)">${bossSvg(150)}</div><div style="position:absolute;left:12px;top:10px;font:900 30px Nunito;color:#fb5063">VS</div>` },
     ];
     for (const c of cards) {
       const card = box(c.x, 293, 261, 275, 'pm-level');
@@ -107,8 +111,26 @@ route('discover', (el, { page = 1 } = {}) => {
     t.append(back);
     onTap(back, () => go('discover'), { sound: 'nav' });
   }
+  // celebrate levels that opened since the last visit
+  const LV = [1, 2, 3, 4, 5, 6, 7, 8];
+  if (!pr.seenOpen) { pr.seenOpen = LV.filter(open); store.save(); }
+  const fresh = LV.filter(n => open(n) && !pr.seenOpen.includes(n));
+  if (fresh.length) {
+    pr.seenOpen.push(...fresh); store.save();
+    const n = fresh[0], elsewhere = (n > 4) !== (page === 2);
+    setTimeout(() => {
+      const card = h('div', 'pm-card pop');
+      card.style.width = '560px';
+      card.innerHTML = `${ICON.party(96)}<h2>Level ${n} is open!</h2><p>${elsewhere ? 'Let’s go and find it!' : 'Tap it to start learning.'}</p>`;
+      const ok = h('div', 'pm-btn', elsewhere ? 'LET’S GO!' : 'YAY!');
+      card.append(ok);
+      const o = overlay(card, { closeOnDim: true });
+      onTap(ok, () => { o.close(); if (elsewhere) go('discover', { page: n > 4 ? 2 : 1 }); }, { sound: 'sparkle' });
+      sfx('unlock'); confetti(90); say('ui_level_open');
+    }, 500);
+  }
   onTap($(t, '96:182'), () => settingsPopup());
-  say('ui_discover');
+  if (!fresh.length) say('ui_discover');
 });
 
 route('minigames', el => {
@@ -157,11 +179,13 @@ route('phonodex', (el, { filter = 'all' } = {}) => {
   const letters = filter === 'badges' ? [] : LETTERS.filter(L => filter === 'all' || (filter === 'vowels') === VOWELS.includes(L));
   for (const L of letters) {
     const open = store.isUnlocked(L);
-    const tile = h('div', `relative h-[149px] rounded-[10px] overflow-hidden ${open ? 'bg-[#e6f5fb]' : 'bg-[#393d40]'}`);
+    const shiny = open && store.progress().best[`l1_${L}`] === 3;
+    const tile = h('div', `relative h-[149px] rounded-[10px] overflow-hidden ${shiny ? 'pm-shiny' : open ? 'bg-[#e6f5fb]' : 'bg-[#393d40]'}`);
     // monster centred in the left half of the tile, letters centred in the right half
     tile.innerHTML = `<img src="${monsterSrc(L)}" alt="" style="position:absolute;left:8px;top:8px;width:132px;height:133px;object-fit:contain;pointer-events:none;${open ? '' : 'filter:brightness(0) opacity(.85)'}">
       <p style="position:absolute;left:140px;right:8px;top:0;bottom:0;margin:0;display:flex;align-items:center;justify-content:center;font-family:'Cal Sans',Fredoka,sans-serif;font-size:56px;color:${open ? '#1d6b62' : '#5d6a6c'}">${L}${L.toLowerCase()}</p>`;
     if (!open) tile.append(h('div', '', `<div style="position:absolute;left:42px;top:42px;pointer-events:none">${lockSvg(64)}</div>`));
+    if (shiny) tile.append(h('div', 'pm-sparkles', ICON.sparkle(26) + ICON.sparkle(18, '#fff') + ICON.sparkle(22)));
     grid.append(tile);
     onTap(tile, () => {
       if (open) go('monster', { L, filter });
@@ -169,7 +193,9 @@ route('phonodex', (el, { filter = 'all' } = {}) => {
     }, { sound: open ? 'pop' : null });
   }
   const count = store.progress().unlocked.length;
-  t.append(box(49, 640, 141, 60, "flex flex-col items-center justify-center font-['Nunito'] font-extrabold text-[#1c9886] text-[18px] leading-tight", `<span class="text-[28px]">${count}/26</span>collected`));
+  const shinies = LETTERS.filter(L => store.progress().best[`l1_${L}`] === 3).length;
+  t.append(box(49, 636, 141, 110, "flex flex-col items-center justify-center font-['Nunito'] font-extrabold text-[#1c9886] text-[18px] leading-tight", `<span class="text-[28px]">${count}/26</span>collected<span class="text-[22px] mt-2" style="color:#e8a800">${shinies}/26</span>shiny`));
+  if (filter !== 'badges') t.append(box(189, 788, 963, 30, "text-center font-['Nunito'] font-bold text-[16px] text-[#1c9886]", 'Get 3 stars on a letter lesson to make its monster shiny!'));
   say('ui_phonodex');
 });
 
@@ -187,6 +213,7 @@ route('monster', (el, { L = 'A', filter = 'all' }) => {
   const art = $(t, '97:495');
   art.innerHTML = `<img src="${monsterSrc(L)}" alt="Monster ${L}" class="absolute inset-0 size-full object-contain pointer-events-none">`;
   art.classList.add('float');
+  if (store.progress().best[`l1_${L}`] === 3) t.append(box(80, 600, 300, 50, 'pm-shinytag', `${ICON.sparkle(24)} Shiny monster! ${ICON.sparkle(24)}`));
   // wiggle the picture inside the floating box, so the float carries on instead of snapping down
   onTap(art, () => { sfx('giggle'); animate(art.querySelector('img'), 'wiggle'); say(`snd_${L}`); }, { sound: null });
   const playSound = () => { say(`snd_${L}`); };
@@ -221,10 +248,10 @@ route('shop', el => {
   };
   const items = [
     [46, 276, 403, 521, () => parentGate(unlockAll)],
-    [467, 276, 401, 330, () => soon('Physical Books', 'img-17503c5cad2f.png')],
-    [891, 276, 261, 330, () => soon('Soft Toys', 'img-fed0abbabfba.png')],
-    [467, 563, 402, 231, () => soon('Worksheets', 'img-9f8515ace2bb.png')],
-    [891, 563, 261, 231, () => soon('Merchandise', 'img-83fd85e6a8ee.png')],
+    [467, 276, 401, 330, () => productCard('books')],
+    [891, 276, 261, 330, () => productCard('toys')],
+    [467, 563, 402, 231, () => worksheets()],
+    [891, 563, 261, 231, () => productCard('merch')],
   ];
   for (const [x, y, w, hh, fn] of items) { const b = box(x, y, w, hh, 'z-10 rounded-[10px]'); t.append(b); onTap(b, fn, { sound: 'pop' }); }
   function unlockAll() {
@@ -236,6 +263,6 @@ route('shop', el => {
     row.append(no, yes); card.append(row);
     const o = overlay(card, { closeOnDim: true });
     onTap(no, () => o.close());
-    onTap(yes, () => { store.unlockAll(); o.close(); sfx('unlock'); say('ui_unlocked'); toast('All monsters and levels unlocked! 🎉'); }, { sound: 'sparkle' });
+    onTap(yes, () => { store.unlockAll(); o.close(); sfx('unlock'); say('ui_unlocked'); toast('All monsters and levels unlocked!'); }, { sound: 'sparkle' });
   }
 });

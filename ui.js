@@ -4,6 +4,7 @@ import * as store from './store.js';
 import { sfx, say, stopVoice, applySettings } from './audio.js';
 import { PICS } from './data.js';
 import { coinPill, onAvatarChange } from './game.js';
+import { hatSvg } from './art.js';
 
 export const monsterSrc = L => `m-${L.toUpperCase()}.png`;
 export const picSrc = w => { const p = PICS[w]; return !p ? null : p.startsWith('art:') ? `art-${p.slice(4)}.png` : `pic-${p}.svg`; };
@@ -43,7 +44,12 @@ export function bindHeader(root) {
     if (t.textContent.trim() === 'Jane Doe' && t.classList.contains('text-[20px]') && p) t.textContent = p.name;
   }
   const av = $$(root, '[data-name="testpfp1-03-03 1"]')[0];
-  const drawAvatar = () => { if (av && store.profile()) av.innerHTML = avatarInner(store.profile().avatar); };
+  const drawAvatar = () => {
+    const pr = store.profile();
+    if (!av || !pr) return;
+    av.innerHTML = avatarInner(pr.avatar) + (pr.hat ? `<div class="pm-hat">${hatSvg(pr.hat)}</div>` : '');
+    av.style.overflow = 'visible';
+  };
   drawAvatar(); onAvatarChange(drawAvatar);
   const badge = $$(root, 'div').find(d => d.className.includes('w-[196px]') && d.className.includes('93.75%'));
   if (badge) onTap(badge, () => parentGate(() => go('settings')));
