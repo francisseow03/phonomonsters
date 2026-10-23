@@ -59,6 +59,7 @@ export const UI_LINES = {
   l7: "Tricky words don't follow the rules, so we learn them by heart. Pick a set!",
   l7_look: 'Look at the word, and listen.',
   l7_find: 'Find the word you hear!',
+  find_monster: 'Which monster makes this sound?',
   // Level 8: boss battle
   l8: 'Oh no! Mumble the Word Wizard has mixed up all the sounds! Answer the questions to win them back!',
   boss_pic: 'Which word matches the picture?',

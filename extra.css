@@ -84,3 +84,14 @@
 .pm-slider .mute { flex: none; width: 64px; height: 40px; border-radius: 20px; background: #1c9886; color: #fff; font: 900 16px Nunito, sans-serif; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .pm-slider.off .mute { background: #b8c4c9; }
 .pm-slider.off .track i, .pm-slider.off .track b { background: #c9d3d6; box-shadow: none; }
+
+/* ---------- Level 1 "which monster?" check ---------- */
+.pm-pick { border-radius: 24px; background: #f1fffd; box-shadow: 0 6px 0 #b3e8ff; display: flex; align-items: flex-end; justify-content: center; cursor: pointer; padding-bottom: 12px; box-sizing: border-box; }
+.pm-pick img { max-height: 260px; max-width: 210px; object-fit: contain; pointer-events: none; }
+.pm-pick.yes { background: #d8f8d2; box-shadow: 0 0 0 6px #75d069, 0 6px 0 #5fb84a; }
+.pm-pick.nope { opacity: .35; filter: grayscale(1); }
+/* wrong answers stay marked so the child can see what they tried */
+.pm-tile.tried { background: #ffe0e4; color: #c98a96; box-shadow: none; pointer-events: none; }
+
+.pm-gate { display: flex; gap: 4px; font-size: 26px; line-height: 1; color: #d5dde0; }
+.pm-gate .on { color: #ffc843; text-shadow: 0 2px 0 #e8a800; }

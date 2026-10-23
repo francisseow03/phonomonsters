@@ -89,6 +89,13 @@ route('settings', el => {
   const signOut = box(45, 700, 141, 50, "rounded-[10px] bg-[#f1fffd] flex items-center justify-center font-['Nunito'] font-bold text-[16px] text-[#1c9886] shadow-[0_3px_0_#57b8b6]", 'Sign out');
   t.append(signOut);
   onTap(signOut, () => { store.signOut(); go('login'); }, { sound: 'nav' });
+  if (store.isGuest()) {
+    // playing as a guest: offer to keep the progress in a parent account
+    signOut.remove();
+    const save = box(30, 690, 172, 70, "rounded-[10px] bg-[#fa96ba] flex items-center justify-center text-center font-['Nunito'] font-extrabold text-[15px] leading-tight text-white shadow-[0_4px_0_#e17b9f]", 'Save progress<br>(create account)');
+    t.append(save);
+    onTap(save, () => go('signup'), { sound: 'nav' });
+  }
   const credits = box(45, 760, 141, 30, "flex items-center justify-center font-['Nunito'] font-semibold text-[14px] text-[#1c9886] underline", 'Credits');
   t.append(credits);
   onTap(credits, () => {

@@ -66,7 +66,7 @@ route('discover', (el, { page = 1 } = {}) => {
   bindHeader(t);
   const pr = store.progress(), lv = pr.levels;
   const open = n => store.levelOpen(n);
-  const lock = (n, x, play) => lockLevel(t, x, store.LEVEL_GATES[n].text, play, n);
+  const lock = (n, x, play) => { const g = store.LEVEL_GATES[n]; lockLevel(t, x, g.text, play, n, [Math.min(g.need, g.have(pr) || 0), g.need]); };
   // the Figma Play button (+ its label) under each of the four level cards
   const PLAY = { 45: ['75:68', '60:103'], 326: ['75:70', '75:71'], 607: ['75:72', '75:74'], 888: ['75:73', '75:75'] };
   if (page === 1) {

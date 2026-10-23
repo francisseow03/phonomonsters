@@ -69,9 +69,27 @@ export const today = () => ymd(new Date());
 const yesterday = () => { const d = new Date(); d.setDate(d.getDate() - 1); return ymd(d); };
 
 // ---------- accounts ----------
+/** First launch: a child can start playing straight away; a grown-up can save it to an account later. */
+export function startGuest() {
+  db.accounts.guest ||= { guest: true, pass: null, created: Date.now(), profiles: [{ id: 'p1', name: 'Friend', avatar: 'mA', progress: newProgress() }] };
+  db.session = { email: 'guest', profile: db.accounts.guest.profiles[0].id };
+  save();
+}
+export const isGuest = () => !!account()?.guest;
+
 export async function signUp(email, password) {
   email = email.trim().toLowerCase();
   if (db.accounts[email]) throw new Error('That email already has an account. Please sign in.');
+  // a guest family keeps everything it has played so far
+  if (isGuest()) {
+    const acc = db.accounts.guest;
+    delete db.accounts.guest; delete acc.guest;
+    acc.pass = await hash(password);
+    db.accounts[email] = acc;
+    db.session = { email, profile: db.session.profile };
+    save();
+    return;
+  }
   db.accounts[email] = {
     pass: await hash(password), created: Date.now(),
     profiles: [
@@ -96,7 +114,7 @@ export async function signIn(user, password) {
 export function signOut() { db.session = null; save(); }
 export const signedIn = () => !!(db.session && db.accounts[db.session.email]);
 export const account = () => signedIn() ? db.accounts[db.session.email] : null;
-export const hasAccounts = () => Object.keys(db.accounts).length > 0;
+export const hasAccounts = () => Object.keys(db.accounts).some(k => k !== 'guest');
 
 // ---------- profiles ----------
 export const profiles = () => account()?.profiles || [];
@@ -221,14 +239,15 @@ export function setAvatar(key) { const pr = profile(); if (pr) { pr.avatar = key
 // Level gates: what has to be done before each level opens.
 export const LEVEL_GATES = {
   1: null,
-  2: { text: GATE_TEXT[2], test: p => Object.keys(p.letters).length >= 5 },
-  3: { text: GATE_TEXT[3], test: p => p.levels[2] >= 2 },
-  4: { text: GATE_TEXT[4], test: p => p.levels[3] >= 2 },
-  5: { text: GATE_TEXT[5], test: p => p.levels[4] >= 2 },
-  6: { text: GATE_TEXT[6], test: p => p.levels[5] >= 2 },
-  7: { text: GATE_TEXT[7], test: p => p.levels[6] >= 2 },
-  8: { text: GATE_TEXT[8], test: p => p.levels[7] >= 2 },
+  2: { text: GATE_TEXT[2], need: 5, have: p => Object.keys(p.letters).length },
+  3: { text: GATE_TEXT[3], need: 2, have: p => p.levels[2] },
+  4: { text: GATE_TEXT[4], need: 2, have: p => p.levels[3] },
+  5: { text: GATE_TEXT[5], need: 2, have: p => p.levels[4] },
+  6: { text: GATE_TEXT[6], need: 2, have: p => p.levels[5] },
+  7: { text: GATE_TEXT[7], need: 2, have: p => p.levels[6] },
+  8: { text: GATE_TEXT[8], need: 2, have: p => p.levels[7] },
 };
+for (const g of Object.values(LEVEL_GATES)) if (g) g.test = p => (g.have(p) || 0) >= g.need;
 // a level the child has already played stays open (saves from before the gates existed)
 export function levelOpen(n) { const p = progress(), g = LEVEL_GATES[n]; return !g || p.allLevels || p.levels[n] > 0 || g.test(p); }
 export function addMinute() {

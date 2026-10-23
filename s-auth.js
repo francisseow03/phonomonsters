@@ -12,8 +12,9 @@ route('splash', el => {
     unlock();
     music('menu');
     say('ui_welcome');
-    if (store.signedIn()) go('profiles');
-    else go(store.hasAccounts() ? 'login' : 'signup');
+    if (store.signedIn()) go(store.isGuest() ? 'home' : 'profiles');
+    else if (store.hasAccounts()) go('login');
+    else { store.startGuest(); go('home'); } // first launch: straight into play, no sign-up wall
   }, { sound: 'pop' });
   play.classList.add('pulse');
   play.style.transformOrigin = '529px 599px';
@@ -36,17 +37,20 @@ route('signup', el => {
   const pass = field(t, 311, 336, 572, 68, 'password', 'Password');
   const conf = field(t, 311, 435, 572, 68, 'password', 'Confirm Password');
   pass.autocomplete = conf.autocomplete = 'new-password';
-  let agree = true;
+  // consent must be an active choice by the grown-up, so the box starts unticked
+  let agree = false;
   const tick = $(t, '73:134'), sq = $(t, '73:124');
   const toggle = () => { agree = !agree; tick.style.opacity = agree ? 1 : 0; sq.style.background = agree ? '#20c9bd' : '#fff'; sq.style.border = agree ? '' : '3px solid #20c9bd'; };
   [tick, sq].forEach(n => onTap(n, toggle));
   onTap($(t, '73:123'), toggle);
+  tick.style.opacity = 0; sq.style.background = '#fff'; sq.style.border = '3px solid #20c9bd';
+  t.append(box(311, 660, 572, 44, "text-center font-['Nunito'] text-[15px] text-[#555] leading-snug", 'Progress is saved on this device only. The microphone is used only while your child holds the mic button.'));
   const submit = async () => {
     if (!/^\S+@\S+\.\S+$/.test(email.value)) return toast('Please enter a valid email');
     if (pass.value.length < 4) return toast('Password needs at least 4 characters');
     if (pass.value !== conf.value) return toast('Passwords do not match');
     if (!agree) return toast('Please agree to the terms first');
-    try { await store.signUp(email.value, pass.value); sfx('sparkle'); go('profiles'); }
+    try { const wasGuest = store.isGuest(); await store.signUp(email.value, pass.value); sfx('sparkle'); go(wasGuest ? 'settings' : 'profiles'); }
     catch (e) { toast(e.message, 3000); }
   };
   onTap($(t, '75:86'), submit, { sound: 'pop' });

@@ -160,7 +160,7 @@ function teamLevel(n, title, color, groups, intro) {
         } else {
           store.recordAnswer(item.d, false);
           tile.classList.add('bad'); animate(tile, 'shake'); tryAgain();
-          setTimeout(() => tile.classList.remove('bad'), 700);
+          setTimeout(() => { tile.classList.remove('bad'); tile.classList.add('tried'); }, 700);
           setTimeout(hear, 1500);
         }
       }, { sound: null });
@@ -252,7 +252,7 @@ route('l7', (el, P) => {
       } else {
         store.recordAnswer(`tw_${word}`, false);
         tile.classList.add('bad'); animate(tile, 'shake'); tryAgain();
-        setTimeout(() => tile.classList.remove('bad'), 700);
+        setTimeout(() => { tile.classList.remove('bad'); tile.classList.add('tried'); }, 700);
         setTimeout(hear, 1500);
       }
     }, { sound: null });

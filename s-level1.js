@@ -3,8 +3,8 @@ import { route, go, tpl, $, $$, h, box, onTap, overlay, confetti, stagePoint, an
 import * as store from './store.js';
 import { music, say, sayAll, sfx, preload, wait } from './audio.js';
 import { lessonChrome, infoPopup, nextArrow, swapForImage, monsterSrc, fitText } from './ui.js';
-import { micAttempt, praise } from './feedback.js';
-import { MONSTERS } from './data.js';
+import { micAttempt, praise, tryAgain } from './feedback.js';
+import { MONSTERS, LETTERS } from './data.js';
 
 const px = (cls, key) => { const m = cls.match(new RegExp(`(?:^|\\s)${key}-\\[(-?[\\d.]+)px\\]`)); return m ? +m[1] : null; };
 
@@ -70,7 +70,8 @@ route('letter', (el, { L, step = 1 }) => {
     onTap($(t, '281:227'), () => { say(`snd_${L}`); animate281(t); });
     const next = () => go('letter', { L, step: 2 });
     onTap($(t, '282:139'), next, { sound: 'nav' }); onTap($(t, '282:140'), next, { sound: 'nav' });
-    sayAll(['ui_listen', `snd_${L}`, 'ui_say_it']);
+    // once the narrator has finished, the way forward bounces so a pre-reader can find it
+    sayAll(['ui_listen', `snd_${L}`, 'ui_say_it']).then(() => pulseNext(t, ['282:139', '282:140']));
   }
   if (step === 2) {
     const t = tpl('l1monster');
@@ -91,7 +92,7 @@ route('letter', (el, { L, step = 1 }) => {
     const next = () => go('letter', { L, step: 3 });
     onTap($(t, '286:155'), next, { sound: 'nav' }); onTap($(t, '286:156'), next, { sound: 'nav' });
     sfx('sparkle');
-    sayAll(['ui_meet', `snd_${L}`]);
+    sayAll(['ui_meet', `snd_${L}`]).then(() => pulseNext(t, ['286:155', '286:156']));
   }
   if (step === 3) {
     const t = tpl('l1trace');
@@ -102,12 +103,51 @@ route('letter', (el, { L, step = 1 }) => {
     const nextBtns = [$(t, '287:304'), $(t, '287:305')];
     nextBtns.forEach(b => { b.style.opacity = 0.35; });
     let ready = false;
-    const finish = () => { if (!ready) { sfx('locked'); say('ui_trace'); return; } complete(L); };
+    const finish = () => { if (!ready) { sfx('locked'); say('ui_trace'); return; } go('letter', { L, step: 4 }); };
     nextBtns.forEach(b => onTap(b, finish, { sound: 'nav' }));
     tracer(t, `${L} ${l}`, () => { ready = true; nextBtns.forEach(b => { b.style.opacity = 1; b.classList.add('pulse'); }); });
     say('ui_trace');
   }
+  if (step === 4) {
+    // quick check: hear the sound, tap the monster that makes it
+    const t = tpl('l4blend');
+    el.append(t);
+    lessonChrome(t, { exit: ['427:416'], gear: ['427:413'], pause: ['427:412', '427:415'] }, { exit });
+    ['427:411', '427:403', '428:580', '428:582', '621:620', '621:621'].forEach(id => $(t, id)?.remove());
+    const others = LETTERS.filter(x => x !== L && MONSTERS[x].say !== MONSTERS[L].say);
+    const opts = [L, ...others.sort(() => Math.random() - 0.5).slice(0, 2)].sort(() => Math.random() - 0.5);
+    el.dataset.answer = L;
+    const hear = () => say(`ph_${L}`);
+    const spk = box(527, 196, 140, 140, '', `<svg viewBox="0 0 140 140" width="140" height="140"><circle cx="70" cy="74" r="66" fill="#018cbc"/><circle cx="70" cy="68" r="66" fill="#1fa7e1"/><path d="M42 56h16l22-18v60L58 80H42z" fill="#fff"/><path d="M90 52q12 16 0 32M100 42q22 26 0 52" stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round"/></svg>`);
+    spk.style.cursor = 'pointer';
+    t.append(spk);
+    onTap(spk, () => { animate(spk, 'bounce'); hear(); });
+    let done = false;
+    opts.forEach((X, i) => {
+      const m = box(196 + i * 280, 370, 240, 300, 'pm-pick');
+      m.innerHTML = `<img src="${monsterSrc(X)}" alt="">`;
+      m.dataset.letter = X;
+      t.append(m);
+      onTap(m, async () => {
+        if (done || m.classList.contains('nope')) return;
+        if (X === L) {
+          done = true; m.classList.add('yes'); animate(m, 'hop');
+          store.recordAnswer(L, true);
+          await praise(true); await say(`ph_${L}`);
+          complete(L);
+        } else {
+          m.classList.add('nope'); animate(m, 'shake'); tryAgain();
+          store.recordAnswer(L, false);
+          setTimeout(hear, 1400);
+        }
+      }, { sound: 'pop' });
+    });
+    sayAll(['ui_find_monster', `ph_${L}`]);
+  }
 });
+
+/** Make a step's Next arrow bounce once the child is free to move on. */
+function pulseNext(t, ids) { ids.forEach(id => { const n = $(t, id); if (n && n.isConnected) n.classList.add('pulse'); }); }
 
 function animate281(t) { const n = $(t, '281:227'); n.classList.add('bounce'); setTimeout(() => n.classList.remove('bounce'), 600); }
 
@@ -119,6 +159,9 @@ function tracer(t, text, done) {
   guide.style.pointerEvents = 'none';
   const cv = mk(10);
   Object.assign(cv.style, { touchAction: 'none', cursor: 'crosshair' });
+  // the letter outline stays on top of the paint so a child never loses the letter under their scribbles
+  const outline = mk(11);
+  outline.style.pointerEvents = 'none';
   const g = cv.getContext('2d');
   g.lineCap = g.lineJoin = 'round'; g.lineWidth = 34; g.strokeStyle = '#109586';
   // guide glyphs and the coverage mask come from the same text metrics, so they always line up
@@ -137,6 +180,9 @@ function tracer(t, text, done) {
     for (const c of [gg, mg]) { c.font = font(); c.textAlign = 'center'; c.textBaseline = 'alphabetic'; c.lineJoin = 'round'; }
     gg.fillStyle = '#aee3e3'; gg.strokeStyle = '#109586'; gg.lineWidth = 4;
     gg.fillText(text, W / 2, cy); gg.strokeText(text, W / 2, cy);
+    const og = outline.getContext('2d');
+    og.font = font(); og.textAlign = 'center'; og.textBaseline = 'alphabetic'; og.lineJoin = 'round';
+    og.setLineDash([14, 12]); og.lineWidth = 5; og.strokeStyle = '#fbfdfe'; og.strokeText(text, W / 2, cy);
     mg.lineWidth = 40; mg.strokeText(text, W / 2, cy); mg.fillText(text, W / 2, cy);
     maskData = mg.getImageData(0, 0, W, H).data;
     for (let i = 3; i < maskData.length; i += 4 * 16) if (maskData[i] > 0) glyphPx++;
@@ -149,14 +195,18 @@ function tracer(t, text, done) {
     if (!last) return;
     const p = pt(e);
     g.beginPath(); g.moveTo(last.x, last.y); g.lineTo(p.x, p.y); g.stroke();
-    // mark coverage cells along the segment
-    const steps = Math.max(1, Math.hypot(p.x - last.x, p.y - last.y) / 6);
+    // mark every coverage cell under the visible brush (34px wide), not just its centre line
+    const steps = Math.max(1, Math.hypot(p.x - last.x, p.y - last.y) / 6), R = 17;
     for (let i = 0; i <= steps; i++) {
-      const x = Math.round(last.x + (p.x - last.x) * i / steps), y = Math.round(last.y + (p.y - last.y) * i / steps);
-      if (x < 0 || y < 0 || x >= W || y >= H) continue;
-      const inGlyph = !maskData || maskData[(y * W + x) * 4 + 3] > 0;
-      const c = (y >> 3) * Math.ceil(W / 8) + (x >> 3);
-      if (inGlyph && !hit[c]) { hit[c] = 1; covered++; }
+      const cx = last.x + (p.x - last.x) * i / steps, cy2 = last.y + (p.y - last.y) * i / steps;
+      for (let dy = -R; dy <= R; dy += 8) for (let dx = -R; dx <= R; dx += 8) {
+        if (dx * dx + dy * dy > R * R) continue;
+        const x = Math.round(cx + dx), y = Math.round(cy2 + dy);
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const inGlyph = !maskData || maskData[(y * W + x) * 4 + 3] > 0;
+        const c = (y >> 3) * Math.ceil(W / 8) + (x >> 3);
+        if (inGlyph && !hit[c]) { hit[c] = 1; covered++; }
+      }
     }
     last = p;
     // ~ 64 mask pixels per 8x8 cell; sampling every 16th pixel above -> glyphPx*16/64 cells
@@ -165,6 +215,17 @@ function tracer(t, text, done) {
   });
   const up = () => { last = null; };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  // a "try again" button wipes the paint
+  const clear = box(X + W - 92, Y + 16, 72, 72, '');
+  clear.style.cssText += 'z-index:12;border-radius:50%;background:#fa96ba;box-shadow:0 5px 0 #e17b9f;display:flex;align-items:center;justify-content:center;cursor:pointer';
+  clear.innerHTML = '<svg viewBox="0 0 40 40" width="40" height="40"><path d="M30 14a12 12 0 1 0 2 9" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M33 6v10H23" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  t.append(clear);
+  onTap(clear, () => { g.clearRect(0, 0, W, H); if (!finished) { hit.fill(0); covered = 0; } }, { sound: 'pop' });
+  // never a dead end: after three strokes or 15 seconds of trying, the arrow opens anyway
+  let strokes = 0, firstAt = 0;
+  const leniency = () => { if (!finished && covered > 0 && (strokes >= 3 || Date.now() - firstAt > 15000)) { finished = true; praise(true); done(); } };
+  cv.addEventListener('pointerup', () => { strokes++; firstAt ||= Date.now(); leniency(); });
+  const iv = setInterval(() => cv.isConnected ? leniency() : clearInterval(iv), 1000);
 }
 
 function complete(L) {

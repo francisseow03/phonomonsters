@@ -34,6 +34,7 @@ function storyCard(t, k, x, pr) {
 }
 
 route('reading', (el, { page = 1 } = {}) => {
+  [1, 2, 3, 4, 5, 6, 7].forEach(i => { const im = new Image(); im.src = `story-p${i}.png`; }); // Story 1 pages open without a blank flash
   const t = tpl('reading');
   el.append(t);
   music('story');

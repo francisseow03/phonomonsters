@@ -136,10 +136,12 @@ function refreshAvatars() { avatarRenderer && avatarRenderer(); }
  * Lock a level card (261 x 275 at x, 293): the lock sits in the card's picture box with the
  * same 20px inset as the artwork, and the card's Play button is greyed out.
  */
-export function lockLevel(root, x, need, playEls = [], n) {
+export function lockLevel(root, x, need, playEls = [], n, progress) {
   const panel = box(x + 19, 372, 223, 182, '');
   panel.className = 'pm-lockpanel';
-  panel.innerHTML = `${lockSvg(58)}<b>Locked</b><div>${need}</div>`;
+  // a pre-reader can't read the caption, so the progress is also shown as stars to fill
+  const stars = progress ? `<div class="pm-gate">${Array.from({ length: progress[1] }, (_, i) => `<span class="${i < progress[0] ? 'on' : ''}">★</span>`).join('')}</div>` : '';
+  panel.innerHTML = `${lockSvg(50)}${stars}<div>${need}</div>`;
   root.append(panel);
   playEls.forEach(e => e && e.classList.add('pm-locked-play'));
   // the whole card (and its Play button) explains what opens it
